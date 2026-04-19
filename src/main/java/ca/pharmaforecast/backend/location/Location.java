@@ -31,4 +31,20 @@ public class Location extends BaseEntity {
 
     @Column(name = "deactivated_at")
     private Instant deactivatedAt;
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public Instant getDeactivatedAt() {
+        return deactivatedAt;
+    }
 }
