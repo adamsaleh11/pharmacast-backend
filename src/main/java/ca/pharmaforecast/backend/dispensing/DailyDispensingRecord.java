@@ -9,7 +9,7 @@ public record DailyDispensingRecord(
         String din,
         LocalDate dispensedDate,
         int quantityDispensed,
-        int quantityOnHand,
+        Integer quantityOnHand,
         BigDecimal costPerUnit
 ) {
 }

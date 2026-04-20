@@ -4,6 +4,8 @@ import ca.pharmaforecast.backend.dispensing.DailyDispensingRecord;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
 import ca.pharmaforecast.backend.drug.DinEnrichmentService;
 import ca.pharmaforecast.backend.drug.DinNormalizer;
+import ca.pharmaforecast.backend.drug.Drug;
+import ca.pharmaforecast.backend.drug.DrugRepository;
 import ca.pharmaforecast.backend.drug.InvalidDinException;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -42,8 +44,7 @@ public class CsvProcessingService implements CsvProcessingJob {
     private static final List<String> MANDATORY_COLUMNS = List.of(
             "dispensed_date",
             "din",
-            "quantity_dispensed",
-            "quantity_on_hand"
+            "quantity_dispensed"
     );
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -55,6 +56,7 @@ public class CsvProcessingService implements CsvProcessingJob {
     private final SupabaseRealtimeClient supabaseRealtimeClient;
     private final DinEnrichmentService dinEnrichmentService;
     private final DinNormalizer dinNormalizer;
+    private final DrugRepository drugRepository;
 
     public CsvProcessingService(
             CsvUploadRepository csvUploadRepository,
@@ -62,7 +64,8 @@ public class CsvProcessingService implements CsvProcessingJob {
             DispensingRecordImportRepository dispensingRecordImportRepository,
             SupabaseRealtimeClient supabaseRealtimeClient,
             DinEnrichmentService dinEnrichmentService,
-            DinNormalizer dinNormalizer
+            DinNormalizer dinNormalizer,
+            DrugRepository drugRepository
     ) {
         this.csvUploadRepository = csvUploadRepository;
         this.objectMapper = objectMapper;
@@ -70,6 +73,7 @@ public class CsvProcessingService implements CsvProcessingJob {
         this.supabaseRealtimeClient = supabaseRealtimeClient;
         this.dinEnrichmentService = dinEnrichmentService;
         this.dinNormalizer = dinNormalizer;
+        this.drugRepository = drugRepository;
     }
 
     @Transactional
@@ -90,16 +94,22 @@ public class CsvProcessingService implements CsvProcessingJob {
             return;
         }
 
+        dinEnrichmentService.enrichSync(result.validRows().stream()
+                .map(ValidCsvRow::din)
+                .distinct()
+                .toList());
+
+        ensureDinsExistInDb(result.validRows().stream()
+                .map(ValidCsvRow::din)
+                .distinct()
+                .toList());
+
         dispensingRecordImportRepository.upsertAll(aggregate(locationId, result.validRows()));
         upload.setStatus(CsvUploadStatus.SUCCESS);
         upload.setValidationSummary(toJson(result.summary()));
         upload.setRowCount((Integer) result.summary().get("total_rows"));
         upload.setDrugCount((Integer) result.summary().get("unique_dins"));
         csvUploadRepository.save(upload);
-        dinEnrichmentService.enrich(result.validRows().stream()
-                .map(ValidCsvRow::din)
-                .distinct()
-                .toList());
         supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
     }
 
@@ -149,7 +159,9 @@ public class CsvProcessingService implements CsvProcessingJob {
                     DateParseResult dateResult = parseDate(value(record, headers, "dispensed_date"));
                     LocalDate dispensedDate = dateResult.date();
                     int quantityDispensed = parseInteger(value(record, headers, "quantity_dispensed"));
-                    int quantityOnHand = parseInteger(value(record, headers, "quantity_on_hand"));
+                    Integer quantityOnHand = headers.containsKey("quantity_on_hand")
+                            ? parseInteger(value(record, headers, "quantity_on_hand"))
+                            : null;
                     BigDecimal costPerUnit = parseOptionalCost(record, headers);
                     if (dateResult.nonPreferredFormat()) {
                         nonPreferredDateRows++;
@@ -223,9 +235,12 @@ public class CsvProcessingService implements CsvProcessingJob {
                             row.costPerUnit()
                     );
                 }
+                Integer quantityOnHand = existing.quantityOnHand() == null
+                        ? row.quantityOnHand()
+                        : row.quantityOnHand() == null ? existing.quantityOnHand() : Math.min(existing.quantityOnHand(), row.quantityOnHand());
                 return new AggregateRow(
                         existing.quantityDispensed() + row.quantityDispensed(),
-                        Math.min(existing.quantityOnHand(), row.quantityOnHand()),
+                        quantityOnHand,
                         mergeCost(existing.costPerUnit(), row.costPerUnit())
                 );
             });
@@ -286,23 +301,7 @@ public class CsvProcessingService implements CsvProcessingJob {
             ));
         }
 
-        String quantityOnHand = value(record, headers, "quantity_on_hand");
-        Integer parsedQuantityOnHand = parseInteger(quantityOnHand);
-        if (parsedQuantityOnHand == null) {
-            errors.add(new ValidationError(
-                    rowNumber,
-                    "quantity_on_hand",
-                    safeValue(quantityOnHand),
-                    "Row %d: quantity_on_hand must be a whole number".formatted(rowNumber)
-            ));
-        } else if (parsedQuantityOnHand < 0) {
-            errors.add(new ValidationError(
-                    rowNumber,
-                    "quantity_on_hand",
-                    safeValue(quantityOnHand),
-                    "Row %d: quantity_on_hand cannot be negative".formatted(rowNumber)
-            ));
-        }
+        // quantity_on_hand is now optional historical data and ignored by validation.
 
         if (headers.containsKey("cost_per_unit")) {
             String costPerUnit = value(record, headers, "cost_per_unit");
@@ -411,6 +410,26 @@ public class CsvProcessingService implements CsvProcessingJob {
         return normalized;
     }
 
+    private void ensureDinsExistInDb(List<String> dins) {
+        List<String> existingDins = drugRepository.findAll().stream()
+                .map(Drug::getDin)
+                .toList();
+        List<String> missingDins = dins.stream()
+                .filter(din -> !existingDins.contains(din))
+                .toList();
+        for (String din : missingDins) {
+            Drug drug = new Drug();
+            drug.setDin(din);
+            drug.setName("Unknown Drug");
+            drug.setStrength("Unknown");
+            drug.setForm("Unknown");
+            drug.setTherapeuticClass("Unknown");
+            drug.setManufacturer("Unknown");
+            drug.setLastRefreshedAt(java.time.Instant.now());
+            drugRepository.save(drug);
+        }
+    }
+
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -433,7 +452,7 @@ public class CsvProcessingService implements CsvProcessingJob {
             String din,
             LocalDate dispensedDate,
             int quantityDispensed,
-            int quantityOnHand,
+            Integer quantityOnHand,
             BigDecimal costPerUnit
     ) {
     }
@@ -441,7 +460,7 @@ public class CsvProcessingService implements CsvProcessingJob {
     private record AggregateKey(String din, LocalDate dispensedDate) {
     }
 
-    private record AggregateRow(int quantityDispensed, int quantityOnHand, BigDecimal costPerUnit) {
+    private record AggregateRow(int quantityDispensed, Integer quantityOnHand, BigDecimal costPerUnit) {
     }
 
     private record DateParseResult(boolean valid, LocalDate date, boolean nonPreferredFormat) {

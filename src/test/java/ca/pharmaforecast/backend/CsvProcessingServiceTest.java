@@ -8,6 +8,8 @@ import ca.pharmaforecast.backend.dispensing.DailyDispensingRecord;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
 import ca.pharmaforecast.backend.drug.DinNormalizer;
 import ca.pharmaforecast.backend.drug.DinEnrichmentService;
+import ca.pharmaforecast.backend.drug.Drug;
+import ca.pharmaforecast.backend.drug.DrugRepository;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +48,7 @@ class CsvProcessingServiceTest {
         DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
         SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
         DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
         when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
 
         CsvProcessingService service = new CsvProcessingService(
@@ -54,7 +57,8 @@ class CsvProcessingServiceTest {
                 importRepository,
                 realtimeClient,
                 dinEnrichmentService,
-                dinNormalizer
+                dinNormalizer,
+                drugRepository
         );
 
         service.process(uploadId, locationId, """
@@ -74,7 +78,7 @@ class CsvProcessingServiceTest {
 
         verify(uploadRepository).save(upload);
         verify(importRepository, never()).upsertAll(anyList());
-        verify(dinEnrichmentService, never()).enrich(anyList());
+        verify(dinEnrichmentService, never()).enrichSync(anyList());
         verify(realtimeClient).broadcastUploadComplete(eq(locationId), eq(uploadId), eq(CsvUploadStatus.ERROR), eq(upload.getValidationSummary()));
     }
 
@@ -87,6 +91,7 @@ class CsvProcessingServiceTest {
         DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
         SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
         DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
         when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
 
         CsvProcessingService service = new CsvProcessingService(
@@ -95,7 +100,8 @@ class CsvProcessingServiceTest {
                 importRepository,
                 realtimeClient,
                 dinEnrichmentService,
-                dinNormalizer
+                dinNormalizer,
+                drugRepository
         );
 
         service.process(uploadId, locationId, """
@@ -120,7 +126,7 @@ class CsvProcessingServiceTest {
         assertThat(summary.get("date_range_start").asText()).isEqualTo("2026-04-20");
         assertThat(summary.get("date_range_end").asText()).isEqualTo("2026-04-20");
         verify(importRepository, never()).upsertAll(anyList());
-        verify(dinEnrichmentService, never()).enrich(anyList());
+        verify(dinEnrichmentService, never()).enrichSync(anyList());
         verify(realtimeClient).broadcastUploadComplete(eq(locationId), eq(uploadId), eq(CsvUploadStatus.ERROR), eq(upload.getValidationSummary()));
     }
 
@@ -133,6 +139,7 @@ class CsvProcessingServiceTest {
         DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
         SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
         DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
         when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
 
         CsvProcessingService service = new CsvProcessingService(
@@ -141,7 +148,8 @@ class CsvProcessingServiceTest {
                 importRepository,
                 realtimeClient,
                 dinEnrichmentService,
-                dinNormalizer
+                dinNormalizer,
+                drugRepository
         );
 
         service.process(uploadId, locationId, """
@@ -168,7 +176,7 @@ class CsvProcessingServiceTest {
         assertThat(summary.get("valid_rows").asInt()).isEqualTo(3);
         assertThat(summary.get("invalid_rows").asInt()).isZero();
         assertThat(summary.get("unique_dins").asInt()).isEqualTo(2);
-        verify(dinEnrichmentService).enrich(List.of("00012345", "00099999"));
+        verify(dinEnrichmentService).enrichSync(List.of("00012345", "00099999"));
         verify(realtimeClient).broadcastUploadComplete(eq(locationId), eq(uploadId), eq(CsvUploadStatus.SUCCESS), eq(upload.getValidationSummary()));
     }
 
@@ -180,7 +188,8 @@ class CsvProcessingServiceTest {
         CsvUploadRepository uploadRepository = mock(CsvUploadRepository.class);
         DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
         SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
-        DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
         when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
 
         CsvProcessingService service = new CsvProcessingService(
@@ -189,12 +198,14 @@ class CsvProcessingServiceTest {
                 importRepository,
                 realtimeClient,
                 dinEnrichmentService,
-                dinNormalizer
+                dinNormalizer,
+                drugRepository
         );
 
         service.process(uploadId, locationId, """
-                dispensed_date,din,quantity_dispensed,quantity_on_hand
-                2026-04-19,12345,3,20
+                dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit
+                2026-04-20,123,10,5,0.50
+                2026-04-20,00099999,20,15,1.00
                 """.getBytes(StandardCharsets.UTF_8));
 
         @SuppressWarnings("unchecked")
@@ -204,7 +215,7 @@ class CsvProcessingServiceTest {
         assertThat(records.getValue()).containsExactly(
                 new DailyDispensingRecord(locationId, "00012345", LocalDate.parse("2026-04-19"), 3, 20, null)
         );
-        verify(dinEnrichmentService).enrich(List.of("00012345"));
+        verify(dinEnrichmentService).enrichSync(List.of("00012345"));
     }
 
     @Test
@@ -215,7 +226,8 @@ class CsvProcessingServiceTest {
         CsvUploadRepository uploadRepository = mock(CsvUploadRepository.class);
         DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
         SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
-        DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
         when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
 
         CsvProcessingService service = new CsvProcessingService(
@@ -224,13 +236,14 @@ class CsvProcessingServiceTest {
                 importRepository,
                 realtimeClient,
                 dinEnrichmentService,
-                dinNormalizer
+                dinNormalizer,
+                drugRepository
         );
 
         service.process(uploadId, locationId, """
-                dispensed_date,din,quantity_dispensed,quantity_on_hand
-                13/04/2026,00012345,3,20
-                04/05/2026,00099999,1,7
+                dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit
+                2026-04-20,00012345,3,20,0.50
+                2026-04-19,00012345,3,20,0.50
                 """.getBytes(StandardCharsets.UTF_8));
 
         assertThat(upload.getStatus()).isEqualTo(CsvUploadStatus.ERROR);

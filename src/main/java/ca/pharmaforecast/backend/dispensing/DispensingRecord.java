@@ -33,7 +33,7 @@ public class DispensingRecord extends BaseEntity {
     @Column(name = "quantity_dispensed", nullable = false)
     private Integer quantityDispensed;
 
-    @Column(name = "quantity_on_hand", nullable = false)
+    @Column(name = "quantity_on_hand")
     private Integer quantityOnHand;
 
     @Column(name = "cost_per_unit", precision = 12, scale = 4)
@@ -56,6 +56,22 @@ public class DispensingRecord extends BaseEntity {
 
     public void setQuantityDispensed(Integer quantityDispensed) {
         this.quantityDispensed = quantityDispensed;
+    }
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public String getDin() {
+        return din;
+    }
+
+    public LocalDate getDispensedDate() {
+        return dispensedDate;
+    }
+
+    public Integer getQuantityDispensed() {
+        return quantityDispensed;
     }
 
     public Integer getQuantityOnHand() {

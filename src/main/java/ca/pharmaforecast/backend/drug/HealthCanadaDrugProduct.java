@@ -1,7 +1,9 @@
 package ca.pharmaforecast.backend.drug;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record HealthCanadaDrugProduct(
         @JsonProperty("drug_code") String drugCode,
         @JsonProperty("drug_identification_number") String drugIdentificationNumber,

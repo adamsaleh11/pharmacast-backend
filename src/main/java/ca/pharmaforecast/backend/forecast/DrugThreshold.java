@@ -42,4 +42,12 @@ public class DrugThreshold extends BaseEntity {
 
     @Column(name = "notifications_enabled", nullable = false)
     private Boolean notificationsEnabled;
+
+    public Integer getLeadTimeDays() {
+        return leadTimeDays;
+    }
+
+    public SafetyMultiplier getSafetyMultiplier() {
+        return safetyMultiplier;
+    }
 }

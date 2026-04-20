@@ -13,4 +13,11 @@ public interface DispensingRecordRepository extends JpaRepository<DispensingReco
 
     @Query("select distinct record.locationId from DispensingRecord record where record.din = :din")
     List<UUID> findDistinctLocationIdsByDin(@Param("din") String din);
+
+    List<DispensingRecord> findByLocationIdAndDin(UUID locationId, String din);
+
+    List<DispensingRecord> findByDin(String din);
+
+    @Query("select distinct record.din from DispensingRecord record where record.locationId = :locationId")
+    List<String> findDistinctDinByLocationId(@Param("locationId") UUID locationId);
 }

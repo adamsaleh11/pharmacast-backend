@@ -34,4 +34,20 @@ public class StockAdjustment extends BaseEntity {
 
     @Column(name = "note", nullable = false)
     private String note;
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public String getDin() {
+        return din;
+    }
+
+    public Integer getAdjustmentQuantity() {
+        return adjustmentQuantity;
+    }
+
+    public Instant getAdjustedAt() {
+        return adjustedAt;
+    }
 }

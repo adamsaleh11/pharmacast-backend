@@ -70,6 +70,32 @@ public class DinEnrichmentService {
         this.drugAlertEmailService = drugAlertEmailService;
     }
 
+    public void enrichSync(List<String> dins) {
+        List<String> normalizedDins = dins.stream()
+                .map(this::normalizeOrSkip)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedDins.isEmpty()) {
+            return;
+        }
+
+        Map<String, Drug> existingByDin = drugRepository.findByDinIn(normalizedDins).stream()
+                .collect(Collectors.toMap(Drug::getDin, Function.identity()));
+        Instant now = Instant.now(clock);
+        Instant staleCutoff = now.minus(REFRESH_AGE);
+        List<String> staleDins = normalizedDins.stream()
+                .filter(din -> {
+                    Drug existing = existingByDin.get(din);
+                    return existing == null || !existing.getLastRefreshedAt().isAfter(staleCutoff);
+                })
+                .toList();
+
+        for (String din : staleDins) {
+            enrichSafely(din, existingByDin.get(din), now);
+        }
+    }
+
     @Async("dinEnrichmentExecutor")
     public void enrich(List<String> dins) {
         List<String> normalizedDins = dins.stream()

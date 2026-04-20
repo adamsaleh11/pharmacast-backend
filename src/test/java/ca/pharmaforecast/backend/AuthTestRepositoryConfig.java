@@ -5,10 +5,15 @@ import ca.pharmaforecast.backend.auth.AuthBootstrapService;
 import ca.pharmaforecast.backend.auth.UserRepository;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordRepository;
+import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
 import ca.pharmaforecast.backend.drug.Drug;
 import ca.pharmaforecast.backend.drug.DrugRepository;
 import ca.pharmaforecast.backend.location.Location;
 import ca.pharmaforecast.backend.location.LocationRepository;
+import ca.pharmaforecast.backend.forecast.DrugThresholdRepository;
+import ca.pharmaforecast.backend.forecast.ForecastRepository;
+import ca.pharmaforecast.backend.forecast.ForecastServiceClient;
+import ca.pharmaforecast.backend.forecast.StockAdjustmentRepository;
 import ca.pharmaforecast.backend.notification.DrugAlertEmailService;
 import ca.pharmaforecast.backend.notification.NotificationRepository;
 import ca.pharmaforecast.backend.upload.CsvUpload;
@@ -150,6 +155,31 @@ class AuthTestRepositoryConfig {
     @Bean
     DispensingRecordRepository dispensingRecordRepository() {
         return mock(DispensingRecordRepository.class);
+    }
+
+    @Bean
+    DrugThresholdRepository drugThresholdRepository() {
+        return mock(DrugThresholdRepository.class);
+    }
+
+    @Bean
+    ForecastRepository forecastRepository() {
+        return mock(ForecastRepository.class);
+    }
+
+    @Bean
+    StockAdjustmentRepository stockAdjustmentRepository() {
+        return mock(StockAdjustmentRepository.class);
+    }
+
+    @Bean
+    ForecastServiceClient forecastServiceClient() {
+        return mock(ForecastServiceClient.class);
+    }
+
+    @Bean
+    CurrentStockRepository currentStockRepository() {
+        return mock(CurrentStockRepository.class);
     }
 
     @Bean

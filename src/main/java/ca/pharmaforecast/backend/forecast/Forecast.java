@@ -63,4 +63,108 @@ public class Forecast extends BaseEntity {
 
     @Column(name = "data_points_used")
     private Integer dataPointsUsed;
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public void setDin(String din) {
+        this.din = din;
+    }
+
+    public void setGeneratedAt(Instant generatedAt) {
+        this.generatedAt = generatedAt;
+    }
+
+    public void setForecastHorizonDays(Integer forecastHorizonDays) {
+        this.forecastHorizonDays = forecastHorizonDays;
+    }
+
+    public void setPredictedQuantity(Integer predictedQuantity) {
+        this.predictedQuantity = predictedQuantity;
+    }
+
+    public void setConfidence(ForecastConfidence confidence) {
+        this.confidence = confidence;
+    }
+
+    public void setDaysOfSupply(BigDecimal daysOfSupply) {
+        this.daysOfSupply = daysOfSupply;
+    }
+
+    public void setReorderStatus(ReorderStatus reorderStatus) {
+        this.reorderStatus = reorderStatus;
+    }
+
+    public void setProphetLower(BigDecimal prophetLower) {
+        this.prophetLower = prophetLower;
+    }
+
+    public void setProphetUpper(BigDecimal prophetUpper) {
+        this.prophetUpper = prophetUpper;
+    }
+
+    public void setAvgDailyDemand(BigDecimal avgDailyDemand) {
+        this.avgDailyDemand = avgDailyDemand;
+    }
+
+    public void setReorderPoint(BigDecimal reorderPoint) {
+        this.reorderPoint = reorderPoint;
+    }
+
+    public void setDataPointsUsed(Integer dataPointsUsed) {
+        this.dataPointsUsed = dataPointsUsed;
+    }
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public String getDin() {
+        return din;
+    }
+
+    public Instant getGeneratedAt() {
+        return generatedAt;
+    }
+
+    public Integer getForecastHorizonDays() {
+        return forecastHorizonDays;
+    }
+
+    public Integer getPredictedQuantity() {
+        return predictedQuantity;
+    }
+
+    public ForecastConfidence getConfidence() {
+        return confidence;
+    }
+
+    public BigDecimal getDaysOfSupply() {
+        return daysOfSupply;
+    }
+
+    public ReorderStatus getReorderStatus() {
+        return reorderStatus;
+    }
+
+    public BigDecimal getProphetLower() {
+        return prophetLower;
+    }
+
+    public BigDecimal getProphetUpper() {
+        return prophetUpper;
+    }
+
+    public BigDecimal getAvgDailyDemand() {
+        return avgDailyDemand;
+    }
+
+    public BigDecimal getReorderPoint() {
+        return reorderPoint;
+    }
+
+    public Integer getDataPointsUsed() {
+        return dataPointsUsed;
+    }
 }

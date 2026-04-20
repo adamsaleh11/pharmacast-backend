@@ -26,14 +26,12 @@ public class DispensingRecordImportRepository {
                     din,
                     dispensed_date,
                     quantity_dispensed,
-                    quantity_on_hand,
                     cost_per_unit
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (location_id, din, dispensed_date)
                 DO UPDATE SET
                     quantity_dispensed = EXCLUDED.quantity_dispensed,
-                    quantity_on_hand = EXCLUDED.quantity_on_hand,
                     cost_per_unit = EXCLUDED.cost_per_unit,
                     updated_at = now()
                 """,
@@ -44,8 +42,7 @@ public class DispensingRecordImportRepository {
                     statement.setString(2, record.din());
                     statement.setDate(3, Date.valueOf(record.dispensedDate()));
                     statement.setInt(4, record.quantityDispensed());
-                    statement.setInt(5, record.quantityOnHand());
-                    statement.setBigDecimal(6, record.costPerUnit());
+                    statement.setBigDecimal(5, record.costPerUnit());
                 }
         );
     }
