@@ -49,4 +49,68 @@ public class CsvUpload extends BaseEntity {
 
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public CsvUploadStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(CsvUploadStatus status) {
+        this.status = status;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public Integer getRowCount() {
+        return rowCount;
+    }
+
+    public void setRowCount(Integer rowCount) {
+        this.rowCount = rowCount;
+    }
+
+    public Integer getDrugCount() {
+        return drugCount;
+    }
+
+    public void setDrugCount(Integer drugCount) {
+        this.drugCount = drugCount;
+    }
+
+    public String getValidationSummary() {
+        return validationSummary;
+    }
+
+    public void setValidationSummary(String validationSummary) {
+        this.validationSummary = validationSummary;
+    }
+
+    public Instant getUploadedAt() {
+        return uploadedAt;
+    }
+
+    public void setUploadedAt(Instant uploadedAt) {
+        this.uploadedAt = uploadedAt;
+    }
 }

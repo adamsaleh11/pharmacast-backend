@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -13,7 +14,8 @@ import java.util.UUID;
 public abstract class BaseEntity {
 
     @Id
-    @Column(name = "id", nullable = false, insertable = false, updatable = false)
+    @UuidGenerator
+    @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)

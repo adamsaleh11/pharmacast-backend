@@ -36,6 +36,114 @@ class FlywayMigrationTest {
     }
 
     @Test
+    void productionMigrationsBaselineExistingFoundationSchemaAtV1() {
+        Flyway initialFlyway = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration")
+                .cleanDisabled(false)
+                .load();
+        initialFlyway.clean();
+
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                postgres.getJdbcUrl(),
+                postgres.getUsername(),
+                postgres.getPassword()
+        );
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto");
+        jdbcTemplate.execute("""
+                CREATE TABLE organizations (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    name text NOT NULL,
+                    stripe_customer_id text,
+                    subscription_status text,
+                    trial_ends_at timestamptz
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE locations (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+                    name text NOT NULL,
+                    address text NOT NULL,
+                    deactivated_at timestamptz
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE app_users (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+                    email text NOT NULL,
+                    role text NOT NULL,
+                    CONSTRAINT uq_app_users_email UNIQUE (email)
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE notification_settings (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+                    daily_digest_enabled boolean NOT NULL DEFAULT true,
+                    weekly_insights_enabled boolean NOT NULL DEFAULT true,
+                    critical_alerts_enabled boolean NOT NULL DEFAULT true,
+                    CONSTRAINT uq_notification_settings_organization UNIQUE (organization_id)
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE csv_uploads (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    location_id uuid NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+                    filename text NOT NULL,
+                    status text NOT NULL,
+                    error_message text,
+                    row_count integer,
+                    drug_count integer,
+                    validation_summary jsonb,
+                    uploaded_at timestamptz NOT NULL,
+                    CONSTRAINT ck_csv_uploads_status CHECK (status IN ('pending', 'processing', 'completed', 'failed'))
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE dispensing_records (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    created_at timestamptz NOT NULL DEFAULT now(),
+                    updated_at timestamptz NOT NULL DEFAULT now(),
+                    location_id uuid NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+                    din text NOT NULL,
+                    dispensed_date date NOT NULL,
+                    quantity_dispensed integer NOT NULL,
+                    quantity_on_hand integer NOT NULL,
+                    cost_per_unit numeric(12,4),
+                    patient_id text
+                )
+                """);
+
+        Flyway flyway = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("1")
+                .load();
+
+        MigrateResult result = flyway.migrate();
+
+        assertThat(result.success).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND type = 'BASELINE'",
+                Integer.class
+        )).isEqualTo(1);
+    }
+
+    @Test
     void bootstrapFunctionCreatesFirstOwnerTenantShape() {
         Flyway flyway = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())

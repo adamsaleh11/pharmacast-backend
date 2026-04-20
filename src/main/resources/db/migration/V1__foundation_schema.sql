@@ -8,7 +8,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -18,7 +18,7 @@ CREATE TABLE organizations (
     trial_ends_at timestamptz
 );
 
-CREATE TABLE locations (
+CREATE TABLE IF NOT EXISTS locations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -28,7 +28,7 @@ CREATE TABLE locations (
     deactivated_at timestamptz
 );
 
-CREATE TABLE app_users (
+CREATE TABLE IF NOT EXISTS app_users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -39,7 +39,7 @@ CREATE TABLE app_users (
     CONSTRAINT uq_app_users_email UNIQUE (email)
 );
 
-CREATE TABLE drugs (
+CREATE TABLE IF NOT EXISTS drugs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -56,7 +56,7 @@ CREATE TABLE drugs (
     CONSTRAINT ck_drugs_din_not_blank CHECK (btrim(din) <> '')
 );
 
-CREATE TABLE dispensing_records (
+CREATE TABLE IF NOT EXISTS dispensing_records (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -72,7 +72,7 @@ CREATE TABLE dispensing_records (
     CONSTRAINT ck_dispensing_cost_per_unit_non_negative CHECK (cost_per_unit IS NULL OR cost_per_unit >= 0)
 );
 
-CREATE TABLE forecasts (
+CREATE TABLE IF NOT EXISTS forecasts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -98,7 +98,7 @@ CREATE TABLE forecasts (
     CONSTRAINT ck_forecasts_data_points_minimum CHECK (data_points_used IS NULL OR data_points_used >= 14)
 );
 
-CREATE TABLE drug_thresholds (
+CREATE TABLE IF NOT EXISTS drug_thresholds (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -116,7 +116,7 @@ CREATE TABLE drug_thresholds (
     CONSTRAINT ck_drug_thresholds_safety_multiplier CHECK (safety_multiplier IN ('conservative', 'balanced', 'aggressive'))
 );
 
-CREATE TABLE stock_adjustments (
+CREATE TABLE IF NOT EXISTS stock_adjustments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -127,7 +127,7 @@ CREATE TABLE stock_adjustments (
     note text NOT NULL
 );
 
-CREATE TABLE purchase_orders (
+CREATE TABLE IF NOT EXISTS purchase_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -139,7 +139,7 @@ CREATE TABLE purchase_orders (
     CONSTRAINT ck_purchase_orders_status CHECK (status IN ('draft', 'reviewed', 'sent', 'cancelled'))
 );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -160,7 +160,7 @@ CREATE TABLE notifications (
     ))
 );
 
-CREATE TABLE csv_uploads (
+CREATE TABLE IF NOT EXISTS csv_uploads (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -177,7 +177,7 @@ CREATE TABLE csv_uploads (
     CONSTRAINT ck_csv_uploads_drug_count_non_negative CHECK (drug_count IS NULL OR drug_count >= 0)
 );
 
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -187,7 +187,7 @@ CREATE TABLE chat_messages (
     CONSTRAINT ck_chat_messages_role CHECK (role IN ('user', 'assistant', 'system'))
 );
 
-CREATE TABLE notification_settings (
+CREATE TABLE IF NOT EXISTS notification_settings (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -198,64 +198,64 @@ CREATE TABLE notification_settings (
     CONSTRAINT uq_notification_settings_organization UNIQUE (organization_id)
 );
 
-CREATE INDEX idx_locations_organization_id ON locations(organization_id);
-CREATE INDEX idx_app_users_organization_id ON app_users(organization_id);
-CREATE INDEX idx_dispensing_records_location_din_date ON dispensing_records(location_id, din, dispensed_date);
-CREATE INDEX idx_forecasts_location_din_generated_at ON forecasts(location_id, din, generated_at);
-CREATE INDEX idx_stock_adjustments_location_din_adjusted_at ON stock_adjustments(location_id, din, adjusted_at);
-CREATE INDEX idx_csv_uploads_location_uploaded_at ON csv_uploads(location_id, uploaded_at);
-CREATE INDEX idx_notifications_organization_sent_at ON notifications(organization_id, sent_at);
-CREATE INDEX idx_drugs_din ON drugs(din);
-CREATE INDEX idx_chat_messages_location_created_at ON chat_messages(location_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_locations_organization_id ON locations(organization_id);
+CREATE INDEX IF NOT EXISTS idx_app_users_organization_id ON app_users(organization_id);
+CREATE INDEX IF NOT EXISTS idx_dispensing_records_location_din_date ON dispensing_records(location_id, din, dispensed_date);
+CREATE INDEX IF NOT EXISTS idx_forecasts_location_din_generated_at ON forecasts(location_id, din, generated_at);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_location_din_adjusted_at ON stock_adjustments(location_id, din, adjusted_at);
+CREATE INDEX IF NOT EXISTS idx_csv_uploads_location_uploaded_at ON csv_uploads(location_id, uploaded_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_organization_sent_at ON notifications(organization_id, sent_at);
+CREATE INDEX IF NOT EXISTS idx_drugs_din ON drugs(din);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_location_created_at ON chat_messages(location_id, created_at);
 
-CREATE TRIGGER trg_organizations_updated_at
+CREATE OR REPLACE TRIGGER trg_organizations_updated_at
 BEFORE UPDATE ON organizations
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_locations_updated_at
+CREATE OR REPLACE TRIGGER trg_locations_updated_at
 BEFORE UPDATE ON locations
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_app_users_updated_at
+CREATE OR REPLACE TRIGGER trg_app_users_updated_at
 BEFORE UPDATE ON app_users
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_drugs_updated_at
+CREATE OR REPLACE TRIGGER trg_drugs_updated_at
 BEFORE UPDATE ON drugs
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_dispensing_records_updated_at
+CREATE OR REPLACE TRIGGER trg_dispensing_records_updated_at
 BEFORE UPDATE ON dispensing_records
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_forecasts_updated_at
+CREATE OR REPLACE TRIGGER trg_forecasts_updated_at
 BEFORE UPDATE ON forecasts
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_drug_thresholds_updated_at
+CREATE OR REPLACE TRIGGER trg_drug_thresholds_updated_at
 BEFORE UPDATE ON drug_thresholds
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_stock_adjustments_updated_at
+CREATE OR REPLACE TRIGGER trg_stock_adjustments_updated_at
 BEFORE UPDATE ON stock_adjustments
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_purchase_orders_updated_at
+CREATE OR REPLACE TRIGGER trg_purchase_orders_updated_at
 BEFORE UPDATE ON purchase_orders
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_notifications_updated_at
+CREATE OR REPLACE TRIGGER trg_notifications_updated_at
 BEFORE UPDATE ON notifications
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_csv_uploads_updated_at
+CREATE OR REPLACE TRIGGER trg_csv_uploads_updated_at
 BEFORE UPDATE ON csv_uploads
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_chat_messages_updated_at
+CREATE OR REPLACE TRIGGER trg_chat_messages_updated_at
 BEFORE UPDATE ON chat_messages
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_notification_settings_updated_at
+CREATE OR REPLACE TRIGGER trg_notification_settings_updated_at
 BEFORE UPDATE ON notification_settings
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();

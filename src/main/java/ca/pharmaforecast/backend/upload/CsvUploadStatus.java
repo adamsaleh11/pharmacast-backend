@@ -1,8 +1,8 @@
 package ca.pharmaforecast.backend.upload;
 
 public enum CsvUploadStatus {
-    pending,
-    processing,
-    completed,
-    failed
+    PENDING,
+    PROCESSING,
+    SUCCESS,
+    ERROR
 }
