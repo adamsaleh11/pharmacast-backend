@@ -82,4 +82,65 @@ class FlywayMigrationTest {
                 Integer.class
         )).isEqualTo(1);
     }
+
+    @Test
+    void bootstrapFunctionIsIdempotentForExistingAuthUser() {
+        Flyway flyway = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration")
+                .cleanDisabled(false)
+                .load();
+        flyway.clean();
+        flyway.migrate();
+
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                postgres.getJdbcUrl(),
+                postgres.getUsername(),
+                postgres.getPassword()
+        );
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        UUID authUserId = UUID.randomUUID();
+
+        UUID firstOrganizationId = bootstrap(jdbcTemplate, authUserId, "owner@example.com")
+                .organizationId();
+        BootstrapRow secondBootstrap = bootstrap(jdbcTemplate, authUserId, "owner@example.com");
+
+        assertThat(secondBootstrap.organizationId()).isEqualTo(firstOrganizationId);
+        assertThat(secondBootstrap.userId()).isEqualTo(authUserId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM app_users WHERE id = ?",
+                Integer.class,
+                authUserId
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM organizations",
+                Integer.class
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM notification_settings",
+                Integer.class
+        )).isEqualTo(1);
+    }
+
+    private BootstrapRow bootstrap(JdbcTemplate jdbcTemplate, UUID authUserId, String email) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT organization_id, location_id, user_id
+                        FROM bootstrap_first_owner_user(?, ?, ?, ?, ?)
+                        """,
+                (rs, rowNum) -> new BootstrapRow(
+                        rs.getObject("organization_id", UUID.class),
+                        rs.getObject("location_id", UUID.class),
+                        rs.getObject("user_id", UUID.class)
+                ),
+                authUserId,
+                email,
+                "Main Pharmacy",
+                "Main Pharmacy - Bank",
+                "100 Bank St, Ottawa, ON"
+        );
+    }
+
+    private record BootstrapRow(UUID organizationId, UUID locationId, UUID userId) {
+    }
 }

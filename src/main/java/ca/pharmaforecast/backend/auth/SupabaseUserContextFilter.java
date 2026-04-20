@@ -31,7 +31,15 @@ public class SupabaseUserContextFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return "POST".equalsIgnoreCase(request.getMethod()) && "/auth/logout".equals(request.getServletPath());
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+        return "/auth/logout".equals(path) || "/auth/bootstrap".equals(path);
     }
 
     @Override

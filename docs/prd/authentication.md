@@ -8,7 +8,7 @@ PharmaForecast needs a production-ready backend authentication boundary before t
 
 Implement Supabase JWT validation in Spring Security using Supabase JWKS, then resolve every authenticated request into a typed PharmaForecast user context. The backend will expose `/auth/me` so the frontend can load the current user, role, organization, and active locations after Supabase sign-in. The backend will expose `/auth/logout` as a stateless Supabase-compatible acknowledgement while the frontend remains responsible for calling Supabase sign-out and discarding local session state.
 
-First-time signup bootstrap will be supported through a DB-side function that creates an organization, first location, owner user row, and default notification settings from trusted signup context. Supabase remains the JWT issuer and identity source of truth; PharmaForecast database rows remain the authorization and tenant profile source of truth.
+First-time signup bootstrap will be supported through a backend endpoint backed by a DB-side function that creates an organization, first location, owner user row, and default notification settings from trusted signup context. Supabase remains the JWT issuer and identity source of truth; PharmaForecast database rows remain the authorization and tenant profile source of truth.
 
 ## User Stories
 
@@ -37,7 +37,7 @@ First-time signup bootstrap will be supported through a DB-side function that cr
 - If a valid JWT has no matching `app_users` row, the backend returns `403` with `USER_PROFILE_NOT_BOOTSTRAPPED`.
 - `/auth/me` returns only active locations.
 - `/auth/logout` does not revoke Supabase JWTs. It returns a stateless success response and documents that the frontend must call Supabase sign-out.
-- Signup bootstrap is represented as a DB-side callable function, not a Spring-issued JWT or role-claim mutation.
+- Signup bootstrap is represented as `POST /auth/bootstrap`, backed by a DB-side callable function, not a Spring-issued JWT or role-claim mutation.
 - Frontend signup metadata expected for bootstrap is `organization_name`, `location_name`, and `location_address`.
 
 ## Testing Decisions

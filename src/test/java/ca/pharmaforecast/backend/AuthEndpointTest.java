@@ -1,6 +1,7 @@
 package ca.pharmaforecast.backend;
 
 import ca.pharmaforecast.backend.auth.User;
+import ca.pharmaforecast.backend.auth.AuthBootstrapService;
 import ca.pharmaforecast.backend.auth.UserRole;
 import ca.pharmaforecast.backend.location.Location;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +19,10 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,6 +56,15 @@ class AuthEndpointTest {
         mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void authBootstrapCorsPreflightDoesNotRequireBearerToken() throws Exception {
+        mockMvc.perform(options("/auth/bootstrap")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -90,6 +102,52 @@ class AuthEndpointTest {
     void logoutIsStatelessAcknowledgement() throws Exception {
         mockMvc.perform(post("/auth/logout"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void bootstrapCreatesFirstOwnerTenantShapeFromValidJwtAndMetadata() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        AuthTestRepositoryConfig.bootstrapReturns(
+                new AuthBootstrapService.BootstrapResult(organizationId, locationId, userId)
+        );
+
+        mockMvc.perform(post("/auth/bootstrap")
+                        .with(supabaseJwt(userId, "owner@example.com"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "organization_name": "Main Pharmacy",
+                                  "location_name": "Main Pharmacy - Bank",
+                                  "location_address": "100 Bank St, Ottawa, ON"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organization_id").value(organizationId.toString()))
+                .andExpect(jsonPath("$.location_id").value(locationId.toString()))
+                .andExpect(jsonPath("$.user_id").value(userId.toString()));
+
+        assertThat(AuthTestRepositoryConfig.LAST_BOOTSTRAP_COMMAND.authUserId()).isEqualTo(userId);
+        assertThat(AuthTestRepositoryConfig.LAST_BOOTSTRAP_COMMAND.email()).isEqualTo("owner@example.com");
+        assertThat(AuthTestRepositoryConfig.LAST_BOOTSTRAP_COMMAND.organizationName()).isEqualTo("Main Pharmacy");
+        assertThat(AuthTestRepositoryConfig.LAST_BOOTSTRAP_COMMAND.locationName()).isEqualTo("Main Pharmacy - Bank");
+        assertThat(AuthTestRepositoryConfig.LAST_BOOTSTRAP_COMMAND.locationAddress()).isEqualTo("100 Bank St, Ottawa, ON");
+    }
+
+    @Test
+    void bootstrapRequiresJwt() throws Exception {
+        mockMvc.perform(post("/auth/bootstrap")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "organization_name": "Main Pharmacy",
+                                  "location_name": "Main Pharmacy - Bank",
+                                  "location_address": "100 Bank St, Ottawa, ON"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("AUTHENTICATION_REQUIRED"));
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor supabaseJwt(UUID userId, String email) {

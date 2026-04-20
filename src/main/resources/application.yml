@@ -1,8 +1,10 @@
 spring:
   application:
     name: pharmaforecast-backend
+  config:
+    import: optional:file:./config.properties
   profiles:
-    default: local
+    include: prod
   datasource:
     url: jdbc:postgresql://localhost:5432/pharmaforecast
     username: pharmaforecast
@@ -32,7 +34,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info
   endpoint:
     health:
       probes:
@@ -41,6 +43,10 @@ management:
 server:
   port: 8080
 
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
 ---
 spring:
   config:
@@ -48,7 +54,6 @@ spring:
       on-profile: local
   flyway:
     locations: classpath:db/migration,classpath:db/dev-migration
-
 ---
 spring:
   config:
@@ -58,8 +63,13 @@ spring:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
+    hikari:
+      data-source-properties:
+        prepareThreshold: 0
   flyway:
     locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
   jpa:
     properties:
       hibernate:

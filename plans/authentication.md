@@ -71,11 +71,12 @@ Expose `/auth/me` and `/auth/logout` so the frontend can initialize authenticate
 
 ### What to build
 
-Provide a DB-side bootstrap function that creates the first organization, location, owner user row, and default notification settings for a first-time Supabase Auth user.
+Provide a backend bootstrap endpoint backed by a DB-side function that creates the first organization, location, owner user row, and default notification settings for a first-time Supabase Auth user.
 
 ### Acceptance criteria
 
 - [ ] Bootstrap accepts trusted auth user id and email plus frontend metadata.
+- [ ] `POST /auth/bootstrap` requires a valid Supabase JWT.
 - [ ] Required metadata is `organization_name`, `location_name`, and `location_address`.
 - [ ] Created user has role `owner`.
 - [ ] Bootstrap can be retried for an already-created user without duplicating the organization.
