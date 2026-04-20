@@ -41,4 +41,28 @@ public class DispensingRecord extends BaseEntity {
 
     @Column(name = "patient_id")
     private String patientId;
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public void setDin(String din) {
+        this.din = din;
+    }
+
+    public void setDispensedDate(LocalDate dispensedDate) {
+        this.dispensedDate = dispensedDate;
+    }
+
+    public void setQuantityDispensed(Integer quantityDispensed) {
+        this.quantityDispensed = quantityDispensed;
+    }
+
+    public Integer getQuantityOnHand() {
+        return quantityOnHand;
+    }
+
+    public void setQuantityOnHand(Integer quantityOnHand) {
+        this.quantityOnHand = quantityOnHand;
+    }
 }

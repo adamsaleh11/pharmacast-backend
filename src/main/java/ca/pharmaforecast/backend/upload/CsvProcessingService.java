@@ -3,6 +3,8 @@ package ca.pharmaforecast.backend.upload;
 import ca.pharmaforecast.backend.dispensing.DailyDispensingRecord;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
 import ca.pharmaforecast.backend.drug.DinEnrichmentService;
+import ca.pharmaforecast.backend.drug.DinNormalizer;
+import ca.pharmaforecast.backend.drug.InvalidDinException;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,19 +54,22 @@ public class CsvProcessingService implements CsvProcessingJob {
     private final DispensingRecordImportRepository dispensingRecordImportRepository;
     private final SupabaseRealtimeClient supabaseRealtimeClient;
     private final DinEnrichmentService dinEnrichmentService;
+    private final DinNormalizer dinNormalizer;
 
     public CsvProcessingService(
             CsvUploadRepository csvUploadRepository,
             ObjectMapper objectMapper,
             DispensingRecordImportRepository dispensingRecordImportRepository,
             SupabaseRealtimeClient supabaseRealtimeClient,
-            DinEnrichmentService dinEnrichmentService
+            DinEnrichmentService dinEnrichmentService,
+            DinNormalizer dinNormalizer
     ) {
         this.csvUploadRepository = csvUploadRepository;
         this.objectMapper = objectMapper;
         this.dispensingRecordImportRepository = dispensingRecordImportRepository;
         this.supabaseRealtimeClient = supabaseRealtimeClient;
         this.dinEnrichmentService = dinEnrichmentService;
+        this.dinNormalizer = dinNormalizer;
     }
 
     @Transactional
@@ -140,7 +145,7 @@ public class CsvProcessingService implements CsvProcessingJob {
                         continue;
                     }
 
-                    String din = value(record, headers, "din");
+                    String din = dinNormalizer.normalize(value(record, headers, "din"));
                     DateParseResult dateResult = parseDate(value(record, headers, "dispensed_date"));
                     LocalDate dispensedDate = dateResult.date();
                     int quantityDispensed = parseInteger(value(record, headers, "quantity_dispensed"));
@@ -252,12 +257,14 @@ public class CsvProcessingService implements CsvProcessingJob {
         }
 
         String dinValue = value(record, headers, "din");
-        if (!dinValue.matches("\\d{8}")) {
+        try {
+            dinNormalizer.normalize(dinValue);
+        } catch (InvalidDinException ex) {
             errors.add(new ValidationError(
                     rowNumber,
                     "din",
                     safeValue(dinValue),
-                    "Row %d: DIN '%s' is invalid — DINs must be exactly 8 digits".formatted(rowNumber, dinValue)
+                    "Row %d: DIN '%s' is invalid — DINs must be 1 to 8 numeric digits".formatted(rowNumber, dinValue)
             ));
         }
 

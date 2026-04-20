@@ -6,6 +6,7 @@ import ca.pharmaforecast.backend.upload.CsvUploadRepository;
 import ca.pharmaforecast.backend.upload.CsvUploadStatus;
 import ca.pharmaforecast.backend.dispensing.DailyDispensingRecord;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
+import ca.pharmaforecast.backend.drug.DinNormalizer;
 import ca.pharmaforecast.backend.drug.DinEnrichmentService;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 class CsvProcessingServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final DinNormalizer dinNormalizer = new DinNormalizer();
 
     @Test
     void missingMandatoryColumnMarksUploadErrorWithSafeValidationDetails() throws Exception {
@@ -51,7 +53,8 @@ class CsvProcessingServiceTest {
                 objectMapper,
                 importRepository,
                 realtimeClient,
-                dinEnrichmentService
+                dinEnrichmentService,
+                dinNormalizer
         );
 
         service.process(uploadId, locationId, """
@@ -91,18 +94,19 @@ class CsvProcessingServiceTest {
                 objectMapper,
                 importRepository,
                 realtimeClient,
-                dinEnrichmentService
+                dinEnrichmentService,
+                dinNormalizer
         );
 
         service.process(uploadId, locationId, """
                 dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit,patient_id
-                19-04-2026,12345,-1,8,-0.50,patient-123
+                19-04-2026,ABC12345,-1,8,-0.50,patient-123
                 2026-04-20,00012345,0,7,1.25,patient-456
                 """.getBytes(StandardCharsets.UTF_8));
 
         assertThat(upload.getStatus()).isEqualTo(CsvUploadStatus.ERROR);
         assertThat(upload.getErrorMessage()).contains("Dates in column 'dispensed_date' must be in YYYY-MM-DD format");
-        assertThat(upload.getErrorMessage()).contains("Row 2: DIN '12345' is invalid");
+        assertThat(upload.getErrorMessage()).contains("Row 2: DIN 'ABC12345' is invalid");
         assertThat(upload.getErrorMessage()).contains("Row 2: quantity_dispensed cannot be negative");
         assertThat(upload.getErrorMessage()).contains("cost_per_unit");
         assertThat(upload.getErrorMessage()).doesNotContain("patient-123");
@@ -136,7 +140,8 @@ class CsvProcessingServiceTest {
                 objectMapper,
                 importRepository,
                 realtimeClient,
-                dinEnrichmentService
+                dinEnrichmentService,
+                dinNormalizer
         );
 
         service.process(uploadId, locationId, """
@@ -168,6 +173,41 @@ class CsvProcessingServiceTest {
     }
 
     @Test
+    void validShortNumericDinsAreStoredAndEnrichedCanonically() throws Exception {
+        UUID uploadId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        CsvUpload upload = upload(uploadId, locationId);
+        CsvUploadRepository uploadRepository = mock(CsvUploadRepository.class);
+        DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
+        SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
+        DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
+
+        CsvProcessingService service = new CsvProcessingService(
+                uploadRepository,
+                objectMapper,
+                importRepository,
+                realtimeClient,
+                dinEnrichmentService,
+                dinNormalizer
+        );
+
+        service.process(uploadId, locationId, """
+                dispensed_date,din,quantity_dispensed,quantity_on_hand
+                2026-04-19,12345,3,20
+                """.getBytes(StandardCharsets.UTF_8));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DailyDispensingRecord>> records = ArgumentCaptor.forClass((Class<List<DailyDispensingRecord>>) (Class<?>) List.class);
+        verify(importRepository).upsertAll(records.capture());
+
+        assertThat(records.getValue()).containsExactly(
+                new DailyDispensingRecord(locationId, "00012345", LocalDate.parse("2026-04-19"), 3, 20, null)
+        );
+        verify(dinEnrichmentService).enrich(List.of("00012345"));
+    }
+
+    @Test
     void nonPreferredDateFormatsAreAcceptedWithWarningsButAmbiguousDatesFail() throws Exception {
         UUID uploadId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
@@ -183,7 +223,8 @@ class CsvProcessingServiceTest {
                 objectMapper,
                 importRepository,
                 realtimeClient,
-                dinEnrichmentService
+                dinEnrichmentService,
+                dinNormalizer
         );
 
         service.process(uploadId, locationId, """

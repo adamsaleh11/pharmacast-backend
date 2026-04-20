@@ -35,6 +35,8 @@ pharmaforecast:
       issuer: ${SUPABASE_JWT_ISSUER:}
       audiences:
         - ${SUPABASE_JWT_AUDIENCE:authenticated}
+  jobs:
+    din-refresh-cron: ${DIN_REFRESH_CRON:0 0 7 * * SUN}
 
 management:
   endpoints:

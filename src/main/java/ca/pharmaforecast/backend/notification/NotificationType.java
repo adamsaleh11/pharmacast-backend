@@ -7,5 +7,6 @@ public enum NotificationType {
     weekly_insight,
     csv_upload_completed,
     csv_upload_failed,
-    purchase_order_draft
+    purchase_order_draft,
+    DRUG_DISCONTINUED
 }

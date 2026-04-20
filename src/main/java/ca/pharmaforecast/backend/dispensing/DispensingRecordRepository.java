@@ -1,10 +1,16 @@
 package ca.pharmaforecast.backend.dispensing;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface DispensingRecordRepository extends JpaRepository<DispensingRecord, UUID> {
     Optional<DispensingRecord> findTopByLocationIdAndDinOrderByDispensedDateDesc(UUID locationId, String din);
+
+    @Query("select distinct record.locationId from DispensingRecord record where record.din = :din")
+    List<UUID> findDistinctLocationIdsByDin(@Param("din") String din);
 }

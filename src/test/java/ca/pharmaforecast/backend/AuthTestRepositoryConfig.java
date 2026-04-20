@@ -4,8 +4,13 @@ import ca.pharmaforecast.backend.auth.User;
 import ca.pharmaforecast.backend.auth.AuthBootstrapService;
 import ca.pharmaforecast.backend.auth.UserRepository;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordImportRepository;
+import ca.pharmaforecast.backend.dispensing.DispensingRecordRepository;
+import ca.pharmaforecast.backend.drug.Drug;
+import ca.pharmaforecast.backend.drug.DrugRepository;
 import ca.pharmaforecast.backend.location.Location;
 import ca.pharmaforecast.backend.location.LocationRepository;
+import ca.pharmaforecast.backend.notification.DrugAlertEmailService;
+import ca.pharmaforecast.backend.notification.NotificationRepository;
 import ca.pharmaforecast.backend.upload.CsvUpload;
 import ca.pharmaforecast.backend.upload.CsvProcessingJob;
 import ca.pharmaforecast.backend.upload.CsvUploadRepository;
@@ -32,6 +37,7 @@ class AuthTestRepositoryConfig {
     static final Map<UserKey, User> USERS = new HashMap<>();
     static final Map<UUID, List<Location>> LOCATIONS = new HashMap<>();
     static final Map<UUID, CsvUpload> CSV_UPLOADS = new HashMap<>();
+    static final Map<String, Drug> DRUGS = new HashMap<>();
     static AuthBootstrapService.BootstrapCommand LAST_BOOTSTRAP_COMMAND;
     static AuthBootstrapService.BootstrapResult BOOTSTRAP_RESULT;
     static CapturedCsvJob LAST_CSV_JOB;
@@ -40,6 +46,7 @@ class AuthTestRepositoryConfig {
         USERS.clear();
         LOCATIONS.clear();
         CSV_UPLOADS.clear();
+        DRUGS.clear();
         LAST_BOOTSTRAP_COMMAND = null;
         BOOTSTRAP_RESULT = null;
         LAST_CSV_JOB = null;
@@ -110,6 +117,21 @@ class AuthTestRepositoryConfig {
     }
 
     @Bean
+    DrugRepository drugRepository() {
+        return (DrugRepository) Proxy.newProxyInstance(
+                DrugRepository.class.getClassLoader(),
+                new Class<?>[]{DrugRepository.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findByDin" -> Optional.ofNullable(DRUGS.get((String) args[0]));
+                    case "toString" -> "AuthTestDrugRepository";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                }
+        );
+    }
+
+    @Bean
     AuthBootstrapService authBootstrapService() {
         return command -> {
             LAST_BOOTSTRAP_COMMAND = command;
@@ -123,6 +145,21 @@ class AuthTestRepositoryConfig {
     @Bean
     DispensingRecordImportRepository dispensingRecordImportRepository() {
         return mock(DispensingRecordImportRepository.class);
+    }
+
+    @Bean
+    DispensingRecordRepository dispensingRecordRepository() {
+        return mock(DispensingRecordRepository.class);
+    }
+
+    @Bean
+    NotificationRepository notificationRepository() {
+        return mock(NotificationRepository.class);
+    }
+
+    @Bean
+    DrugAlertEmailService drugAlertEmailService() {
+        return mock(DrugAlertEmailService.class);
     }
 
     @Bean
@@ -145,6 +182,10 @@ class AuthTestRepositoryConfig {
 
     static void putUpload(CsvUpload upload) {
         CSV_UPLOADS.put(upload.getId(), upload);
+    }
+
+    static void putDrug(Drug drug) {
+        DRUGS.put(drug.getDin(), drug);
     }
 
     static int uploadCount() {

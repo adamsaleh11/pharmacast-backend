@@ -45,4 +45,68 @@ public class Drug extends BaseEntity {
 
     @Column(name = "last_refreshed_at", nullable = false)
     private Instant lastRefreshedAt;
+
+    public String getDin() {
+        return din;
+    }
+
+    public void setDin(String din) {
+        this.din = din;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getStrength() {
+        return strength;
+    }
+
+    public void setStrength(String strength) {
+        this.strength = strength;
+    }
+
+    public String getForm() {
+        return form;
+    }
+
+    public void setForm(String form) {
+        this.form = form;
+    }
+
+    public String getTherapeuticClass() {
+        return therapeuticClass;
+    }
+
+    public void setTherapeuticClass(String therapeuticClass) {
+        this.therapeuticClass = therapeuticClass;
+    }
+
+    public String getManufacturer() {
+        return manufacturer;
+    }
+
+    public void setManufacturer(String manufacturer) {
+        this.manufacturer = manufacturer;
+    }
+
+    public DrugStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(DrugStatus status) {
+        this.status = status;
+    }
+
+    public Instant getLastRefreshedAt() {
+        return lastRefreshedAt;
+    }
+
+    public void setLastRefreshedAt(Instant lastRefreshedAt) {
+        this.lastRefreshedAt = lastRefreshedAt;
+    }
 }

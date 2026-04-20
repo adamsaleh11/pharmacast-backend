@@ -43,4 +43,29 @@ public class Notification extends BaseEntity {
 
     @Column(name = "read_at")
     private Instant readAt;
+
+    public static Notification create(UUID organizationId, UUID locationId, NotificationType type, String payload) {
+        Notification notification = new Notification();
+        notification.organizationId = organizationId;
+        notification.locationId = locationId;
+        notification.type = type;
+        notification.payload = payload;
+        return notification;
+    }
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public NotificationType getType() {
+        return type;
+    }
+
+    public String getPayload() {
+        return payload;
+    }
 }
