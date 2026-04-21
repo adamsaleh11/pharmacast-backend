@@ -139,6 +139,9 @@ class CsvUploadEndpointTest {
                 CsvUploadStatus.PENDING,
                 Instant.parse("2026-04-19T12:00:00Z")
         ));
+        CsvUpload olderUpload = AuthTestRepositoryConfig.upload(olderUploadId);
+        olderUpload.setBacktestModelVersion("xgboost_residual_v1");
+        olderUpload.setBacktestModelPathCounts(java.util.Map.of("xgboost_residual_interval", 18));
 
         mockMvc.perform(get("/locations/{locationId}/uploads", locationId)
                         .with(supabaseJwt(userId, "owner@example.com")))
@@ -154,7 +157,9 @@ class CsvUploadEndpointTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.uploadId").value(olderUploadId.toString()))
                 .andExpect(jsonPath("$.filename").value("older.csv"))
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.backtestModelVersion").value("xgboost_residual_v1"))
+                .andExpect(jsonPath("$.backtestModelPathCounts.xgboost_residual_interval").value(18));
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor supabaseJwt(UUID userId, String email) {

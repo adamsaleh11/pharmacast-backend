@@ -53,17 +53,66 @@ class ForecastServiceClientTest {
                           "days_of_supply":10.0,
                           "avg_daily_demand":20.0,
                           "reorder_status":"GREEN",
+                          "model_path":"xgboost_residual_interval",
                           "reorder_point":60.0,
                           "generated_at":"2026-04-20T12:00:00Z",
                           "data_points_used":14
                         }
                         """, MediaType.APPLICATION_JSON)
-                        .header("X-Forecast-Code-Path", "weekly-normalized-samples-v2"));
+                        .header("X-Forecast-Code-Path", "weekly-xgboost-residual-v1"));
 
         ForecastResult result = client.generateForecast(request);
 
         assertThat(result.predictedQuantity()).isEqualTo(280);
         assertThat(result.reorderStatus()).isEqualTo("GREEN");
+        assertThat(result.modelPath()).isEqualTo("xgboost_residual_interval");
+        server.verify();
+    }
+
+    @Test
+    void generateForecastFailsClosedWhenConfidenceOrReorderStatusAreInvalid() throws Exception {
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl("https://forecast.example");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ForecastServiceClient client = new ForecastServiceClient(builder.build(), "https://forecast.example");
+
+        ForecastRequest request = new ForecastRequest(
+                "loc-123",
+                "00012345",
+                14,
+                42,
+                5,
+                1.5,
+                3,
+                7,
+                List.of()
+        );
+
+        server.expect(requestTo("https://forecast.example/forecast/drug"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {
+                          "din":"00012345",
+                          "location_id":"loc-123",
+                          "horizon_days":14,
+                          "predicted_quantity":280,
+                          "prophet_lower":240,
+                          "prophet_upper":320,
+                          "confidence":"MAYBE",
+                          "days_of_supply":10.0,
+                          "avg_daily_demand":20.0,
+                          "reorder_status":"BLUE",
+                          "model_path":"xgboost_residual_interval",
+                          "reorder_point":60.0,
+                          "generated_at":"2026-04-20T12:00:00Z",
+                          "data_points_used":14
+                        }
+                        """, MediaType.APPLICATION_JSON)
+                        .header("X-Forecast-Code-Path", "weekly-xgboost-residual-v1"));
+
+        assertThatThrownBy(() -> client.generateForecast(request))
+                .isInstanceOf(ForecastServiceUnavailableException.class)
+                .hasMessageContaining("invalid confidence value");
         server.verify();
     }
 
@@ -100,6 +149,7 @@ class ForecastServiceClientTest {
                           "days_of_supply":10.0,
                           "avg_daily_demand":20.0,
                           "reorder_status":"GREEN",
+                          "model_path":"xgboost_residual_interval",
                           "reorder_point":60.0,
                           "generated_at":"2026-04-20T12:00:00Z",
                           "data_points_used":14
@@ -108,7 +158,100 @@ class ForecastServiceClientTest {
 
         assertThatThrownBy(() -> client.generateForecast(request))
                 .isInstanceOf(ForecastServiceUnavailableException.class)
-                .hasMessageContaining("patched build");
+                .hasMessageContaining("expected build");
+        server.verify();
+    }
+
+    @Test
+    void generateForecastFailsClosedWhenRequiredForecastFieldsAreMissing() throws Exception {
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl("https://forecast.example");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ForecastServiceClient client = new ForecastServiceClient(builder.build(), "https://forecast.example");
+
+        ForecastRequest request = new ForecastRequest(
+                "loc-123",
+                "00012345",
+                14,
+                42,
+                5,
+                1.5,
+                3,
+                7,
+                List.of()
+        );
+
+        server.expect(requestTo("https://forecast.example/forecast/drug"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {
+                          "din":"00012345",
+                          "location_id":"loc-123",
+                          "horizon_days":14,
+                          "prophet_lower":240,
+                          "prophet_upper":320,
+                          "confidence":"HIGH",
+                          "days_of_supply":10.0,
+                          "avg_daily_demand":20.0,
+                          "reorder_status":"GREEN",
+                          "model_path":"xgboost_residual_interval",
+                          "reorder_point":60.0,
+                          "generated_at":"2026-04-20T12:00:00Z",
+                          "data_points_used":14
+                        }
+                        """, MediaType.APPLICATION_JSON)
+                        .header("X-Forecast-Code-Path", "weekly-xgboost-residual-v1"));
+
+        assertThatThrownBy(() -> client.generateForecast(request))
+                .isInstanceOf(ForecastServiceUnavailableException.class)
+                .hasMessageContaining("missing required field");
+        server.verify();
+    }
+
+    @Test
+    void generateForecastFailsClosedWhenModelPathIsInvalid() throws Exception {
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl("https://forecast.example");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ForecastServiceClient client = new ForecastServiceClient(builder.build(), "https://forecast.example");
+
+        ForecastRequest request = new ForecastRequest(
+                "loc-123",
+                "00012345",
+                14,
+                42,
+                5,
+                1.5,
+                3,
+                7,
+                List.of()
+        );
+
+        server.expect(requestTo("https://forecast.example/forecast/drug"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {
+                          "din":"00012345",
+                          "location_id":"loc-123",
+                          "horizon_days":14,
+                          "predicted_quantity":280,
+                          "prophet_lower":240,
+                          "prophet_upper":320,
+                          "confidence":"HIGH",
+                          "days_of_supply":10.0,
+                          "avg_daily_demand":20.0,
+                          "reorder_status":"GREEN",
+                          "model_path":"internal-metadata-should-be-ignored",
+                          "reorder_point":60.0,
+                          "generated_at":"2026-04-20T12:00:00Z",
+                          "data_points_used":14
+                        }
+                        """, MediaType.APPLICATION_JSON)
+                        .header("X-Forecast-Code-Path", "weekly-xgboost-residual-v1"));
+
+        assertThatThrownBy(() -> client.generateForecast(request))
+                .isInstanceOf(ForecastServiceUnavailableException.class)
+                .hasMessageContaining("invalid model_path");
         server.verify();
     }
 }

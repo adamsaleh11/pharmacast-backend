@@ -1,7 +1,9 @@
 package ca.pharmaforecast.backend.forecast;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ForecastResult(
         String din,
         @JsonProperty("location_id")
@@ -21,6 +23,8 @@ public record ForecastResult(
         Double avgDailyDemand,
         @JsonProperty("reorder_status")
         String reorderStatus,
+        @JsonProperty("model_path")
+        String modelPath,
         @JsonProperty("reorder_point")
         Double reorderPoint,
         @JsonProperty("generated_at")

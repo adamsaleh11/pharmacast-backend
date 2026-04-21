@@ -6,14 +6,15 @@ import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
 import ca.pharmaforecast.backend.currentstock.CurrentStock;
 import ca.pharmaforecast.backend.forecast.InvalidForecastResultException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
-import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,6 +61,7 @@ class ForecastServiceTest {
                 4.5,
                 2.0,
                 "RED",
+                "xgboost_residual_interval",
                 6.0,
                 "2026-04-20T12:00:00Z",
                 21
@@ -75,7 +77,9 @@ class ForecastServiceTest {
         ForecastResult result = service.generateForecast(locationId, din, 7);
 
         assertThat(result.din()).isEqualTo(din);
-        verify(forecastRepository).save(any(Forecast.class));
+        ArgumentCaptor<Forecast> savedForecast = ArgumentCaptor.forClass(Forecast.class);
+        verify(forecastRepository).save(savedForecast.capture());
+        assertThat(savedForecast.getValue().getModelPath()).isEqualTo("xgboost_residual_interval");
     }
 
     @Test
@@ -107,6 +111,7 @@ class ForecastServiceTest {
                         4.5,
                         2.0,
                         "RED",
+                        "xgboost_residual_interval",
                         6.0,
                         "2026-04-20T12:00:00Z",
                         21
@@ -129,7 +134,7 @@ class ForecastServiceTest {
         when(currentStockRepository.getStockMapForLocation(locationId)).thenReturn(Map.of(din, 30));
         when(forecastServiceClient.generateBatchForecast(any())).thenReturn(
                 new ByteArrayInputStream("""
-                        data: {"din":"%s","forecast":{"din":"%s","location_id":"%s","horizon_days":7,"predicted_quantity":12,"prophet_lower":10,"prophet_upper":5,"confidence":"HIGH","days_of_supply":4.5,"avg_daily_demand":2.0,"reorder_status":"RED","reorder_point":6.0,"generated_at":"2026-04-20T12:00:00Z","data_points_used":21}}
+                        data: {"din":"%s","forecast":{"din":"%s","location_id":"%s","horizon_days":7,"predicted_quantity":12,"prophet_lower":10,"prophet_upper":5,"confidence":"HIGH","days_of_supply":4.5,"avg_daily_demand":2.0,"reorder_status":"RED","model_path":"xgboost_residual_interval","reorder_point":6.0,"generated_at":"2026-04-20T12:00:00Z","data_points_used":21}}
                         data: {"status":"done"}
                         """.formatted(din, din, locationId).getBytes(StandardCharsets.UTF_8))
         );
@@ -165,7 +170,7 @@ class ForecastServiceTest {
         when(currentStockRepository.getStockMapForLocation(locationId)).thenReturn(Map.of(din, 30));
         when(forecastServiceClient.generateBatchForecast(any())).thenReturn(
                 new ByteArrayInputStream("""
-                        data: {"din":"%s","status":"complete","result":{"din":"%s","location_id":"%s","horizon_days":7,"predicted_quantity":12,"prophet_lower":10,"prophet_upper":15,"confidence":"HIGH","days_of_supply":4.5,"avg_daily_demand":2.0,"reorder_status":"RED","reorder_point":6.0,"generated_at":"2026-04-20T12:00:00Z","data_points_used":21}}
+                        data: {"din":"%s","status":"complete","result":{"din":"%s","location_id":"%s","horizon_days":7,"predicted_quantity":12,"prophet_lower":10,"prophet_upper":15,"confidence":"HIGH","days_of_supply":4.5,"avg_daily_demand":2.0,"reorder_status":"RED","model_path":"xgboost_residual_interval","reorder_point":6.0,"generated_at":"2026-04-20T12:00:00Z","data_points_used":21}}
                         data: {"done":true,"total":1,"succeeded":1,"failed":0,"skipped_no_stock":0,"skipped_dins":[]}
                         """.formatted(din, din, locationId).getBytes(StandardCharsets.UTF_8))
         );
@@ -183,6 +188,7 @@ class ForecastServiceTest {
         assertThat(events).hasSize(2);
         assertThat(events.get(0)).isInstanceOf(ForecastBatchEvent.Result.class);
         assertThat(((ForecastBatchEvent.Result) events.get(0)).forecast().predictedQuantity()).isEqualTo(12);
+        assertThat(((ForecastBatchEvent.Result) events.get(0)).forecast().modelPath()).isEqualTo("xgboost_residual_interval");
         assertThat(events.get(1)).isInstanceOf(ForecastBatchEvent.Done.class);
         assertThat(((ForecastBatchEvent.Done) events.get(1)).done()).isTrue();
         assertThat(((ForecastBatchEvent.Done) events.get(1)).succeeded()).isEqualTo(1);

@@ -16,6 +16,8 @@ public record ForecastSummaryDto(
         Double daysOfSupply,
         @JsonProperty("reorder_status")
         String reorderStatus,
+        @JsonProperty("model_path")
+        String modelPath,
         @JsonProperty("generated_at")
         Instant generatedAt,
         @JsonProperty("current_stock")

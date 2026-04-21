@@ -78,6 +78,7 @@ class ForecastEndpointTest {
                 4.5,
                 2.0,
                 "RED",
+                "xgboost_residual_interval",
                 6.0,
                 "2026-04-20T12:00:00Z",
                 21
@@ -98,7 +99,8 @@ class ForecastEndpointTest {
                 .andExpect(jsonPath("$.location_id").value(locationId.toString()))
                 .andExpect(jsonPath("$.predicted_quantity").value(12))
                 .andExpect(jsonPath("$.confidence").value("HIGH"))
-                .andExpect(jsonPath("$.reorder_status").value("RED"));
+                .andExpect(jsonPath("$.reorder_status").value("RED"))
+                .andExpect(jsonPath("$.model_path").value("xgboost_residual_interval"));
     }
 
     @Test

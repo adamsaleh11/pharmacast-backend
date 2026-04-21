@@ -73,6 +73,7 @@ public class ForecastReadService {
                         forecast.getConfidence().name().toUpperCase(),
                         forecast.getDaysOfSupply() == null ? null : forecast.getDaysOfSupply().doubleValue(),
                         forecast.getReorderStatus().name().toUpperCase(),
+                        forecast.getModelPath(),
                         forecast.getGeneratedAt(),
                         currentStockRepository.findByLocationIdAndDin(locationId, forecast.getDin())
                                 .map(CurrentStock::getQuantity)

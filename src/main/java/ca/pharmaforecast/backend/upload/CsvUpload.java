@@ -12,6 +12,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PROTECTED;
@@ -45,6 +46,13 @@ public class CsvUpload extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "validation_summary", columnDefinition = "jsonb")
     private String validationSummary;
+
+    @Column(name = "backtest_model_version")
+    private String backtestModelVersion;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "backtest_model_path_counts", columnDefinition = "jsonb")
+    private Map<String, Integer> backtestModelPathCounts;
 
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
@@ -103,6 +111,22 @@ public class CsvUpload extends BaseEntity {
 
     public void setValidationSummary(String validationSummary) {
         this.validationSummary = validationSummary;
+    }
+
+    public String getBacktestModelVersion() {
+        return backtestModelVersion;
+    }
+
+    public void setBacktestModelVersion(String backtestModelVersion) {
+        this.backtestModelVersion = backtestModelVersion;
+    }
+
+    public Map<String, Integer> getBacktestModelPathCounts() {
+        return backtestModelPathCounts;
+    }
+
+    public void setBacktestModelPathCounts(Map<String, Integer> backtestModelPathCounts) {
+        this.backtestModelPathCounts = backtestModelPathCounts;
     }
 
     public Instant getUploadedAt() {

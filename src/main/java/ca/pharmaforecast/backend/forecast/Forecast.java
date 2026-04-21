@@ -48,6 +48,9 @@ public class Forecast extends BaseEntity {
     @Column(name = "reorder_status", nullable = false)
     private ReorderStatus reorderStatus;
 
+    @Column(name = "model_path", nullable = false)
+    private String modelPath;
+
     @Column(name = "prophet_lower", nullable = false, precision = 12, scale = 2)
     private BigDecimal prophetLower;
 
@@ -93,6 +96,10 @@ public class Forecast extends BaseEntity {
 
     public void setReorderStatus(ReorderStatus reorderStatus) {
         this.reorderStatus = reorderStatus;
+    }
+
+    public void setModelPath(String modelPath) {
+        this.modelPath = modelPath;
     }
 
     public void setProphetLower(BigDecimal prophetLower) {
@@ -145,6 +152,10 @@ public class Forecast extends BaseEntity {
 
     public ReorderStatus getReorderStatus() {
         return reorderStatus;
+    }
+
+    public String getModelPath() {
+        return modelPath;
     }
 
     public BigDecimal getProphetLower() {

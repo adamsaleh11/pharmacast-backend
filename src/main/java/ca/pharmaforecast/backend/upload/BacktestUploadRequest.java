@@ -18,7 +18,11 @@ public record BacktestUploadRequest(
         @JsonProperty("debug_artifacts")
         boolean debugArtifacts
 ) {
+    public static BacktestUploadRequest xgboostResidualV1(UUID organizationId, UUID locationId, UUID csvUploadId, List<BacktestDemandRow> rows) {
+        return new BacktestUploadRequest(organizationId, locationId, csvUploadId, "xgboost_residual_v1", rows, false);
+    }
+
     public static BacktestUploadRequest prophetV1(UUID organizationId, UUID locationId, UUID csvUploadId, List<BacktestDemandRow> rows) {
-        return new BacktestUploadRequest(organizationId, locationId, csvUploadId, "prophet_v1", rows, false);
+        return xgboostResidualV1(organizationId, locationId, csvUploadId, rows);
     }
 }

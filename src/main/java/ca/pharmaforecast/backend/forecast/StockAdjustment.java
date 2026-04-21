@@ -50,4 +50,28 @@ public class StockAdjustment extends BaseEntity {
     public Instant getAdjustedAt() {
         return adjustedAt;
     }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public void setDin(String din) {
+        this.din = din;
+    }
+
+    public void setAdjustmentQuantity(Integer adjustmentQuantity) {
+        this.adjustmentQuantity = adjustmentQuantity;
+    }
+
+    public void setAdjustedAt(Instant adjustedAt) {
+        this.adjustedAt = adjustedAt;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
+    }
 }

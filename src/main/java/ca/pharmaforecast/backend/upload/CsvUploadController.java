@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -61,6 +62,8 @@ public class CsvUploadController {
             Integer rowCount,
             Integer drugCount,
             String validationSummary,
+            String backtestModelVersion,
+            Map<String, Integer> backtestModelPathCounts,
             Instant uploadedAt
     ) {
         static UploadResponse from(CsvUpload upload) {
@@ -71,6 +74,8 @@ public class CsvUploadController {
                     upload.getRowCount(),
                     upload.getDrugCount(),
                     upload.getValidationSummary(),
+                    upload.getBacktestModelVersion(),
+                    upload.getBacktestModelPathCounts(),
                     upload.getUploadedAt()
             );
         }

@@ -61,9 +61,11 @@ class CsvProcessingServiceTest {
         when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId)));
         Map<String, Object> backtestSummary = new java.util.LinkedHashMap<>();
         backtestSummary.put("status", "PASS");
-        backtestSummary.put("model_version", "prophet_v1");
+        backtestSummary.put("model_version", "xgboost_residual_v1");
         backtestSummary.put("wape", 0.12);
+        backtestSummary.put("model_path_counts", Map.of("xgboost_residual_interval", 2));
         backtestSummary.put("rows_evaluated", 2);
+        backtestSummary.put("ready_for_forecast", true);
         backtestSummary.put("generated_at", "2026-04-21T05:00:00+00:00");
         backtestSummary.put("error_message", null);
         when(backtestPort.runUploadBacktest(org.mockito.ArgumentMatchers.any())).thenReturn(backtestSummary);
@@ -92,8 +94,11 @@ class CsvProcessingServiceTest {
         assertThat(request.getValue().organizationId()).isEqualTo(organizationId);
         assertThat(request.getValue().locationId()).isEqualTo(locationId);
         assertThat(request.getValue().csvUploadId()).isEqualTo(uploadId);
+        assertThat(request.getValue().modelVersion()).isEqualTo("xgboost_residual_v1");
         assertThat(request.getValue().rows()).extracting("din").containsExactly("00000123", "00099999");
         assertThat(objectMapper.writeValueAsString(request.getValue())).doesNotContain("patient");
+        assertThat(upload.getBacktestModelVersion()).isEqualTo("xgboost_residual_v1");
+        assertThat(upload.getBacktestModelPathCounts()).containsEntry("xgboost_residual_interval", 2);
 
         JsonNode summary = objectMapper.readTree(upload.getValidationSummary());
         assertThat(summary.get("total_rows").asInt()).isEqualTo(2);

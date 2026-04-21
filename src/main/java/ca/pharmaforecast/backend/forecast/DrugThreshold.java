@@ -58,4 +58,36 @@ public class DrugThreshold extends BaseEntity {
     public SafetyMultiplier getSafetyMultiplier() {
         return safetyMultiplier;
     }
+
+    public Boolean getNotificationsEnabled() {
+        return notificationsEnabled;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public void setDin(String din) {
+        this.din = din;
+    }
+
+    public void setLeadTimeDays(Integer leadTimeDays) {
+        this.leadTimeDays = leadTimeDays;
+    }
+
+    public void setRedThresholdDays(Integer redThresholdDays) {
+        this.redThresholdDays = redThresholdDays;
+    }
+
+    public void setAmberThresholdDays(Integer amberThresholdDays) {
+        this.amberThresholdDays = amberThresholdDays;
+    }
+
+    public void setSafetyMultiplier(SafetyMultiplier safetyMultiplier) {
+        this.safetyMultiplier = safetyMultiplier;
+    }
+
+    public void setNotificationsEnabled(Boolean notificationsEnabled) {
+        this.notificationsEnabled = notificationsEnabled;
+    }
 }

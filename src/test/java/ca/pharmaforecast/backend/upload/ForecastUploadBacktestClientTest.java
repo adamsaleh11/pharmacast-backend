@@ -40,7 +40,7 @@ class ForecastUploadBacktestClientTest {
                           "organization_id": "11111111-1111-1111-1111-111111111111",
                           "location_id": "22222222-2222-2222-2222-222222222222",
                           "csv_upload_id": "33333333-3333-3333-3333-333333333333",
-                          "model_version": "prophet_v1",
+                          "model_version": "xgboost_residual_v1",
                           "debug_artifacts": false,
                           "rows": [
                             {
@@ -55,16 +55,18 @@ class ForecastUploadBacktestClientTest {
                 .andRespond(withSuccess("""
                         {
                           "status": "PASS",
-                          "model_version": "prophet_v1",
+                          "model_version": "xgboost_residual_v1",
                           "wape": 0.12,
+                          "model_path_counts": {"xgboost_residual_interval": 1},
                           "rows_evaluated": 1,
+                          "ready_for_forecast": true,
                           "generated_at": "2026-04-21T05:00:00+00:00",
                           "error_message": null,
                           "artifact_path": null
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.prophetV1(
+        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.xgboostResidualV1(
                 organizationId,
                 locationId,
                 uploadId,
@@ -84,7 +86,7 @@ class ForecastUploadBacktestClientTest {
                 true
         );
 
-        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.prophetV1(
+        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.xgboostResidualV1(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -103,7 +105,7 @@ class ForecastUploadBacktestClientTest {
                 false
         );
 
-        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.prophetV1(
+        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.xgboostResidualV1(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -126,7 +128,7 @@ class ForecastUploadBacktestClientTest {
         server.expect(requestTo("http://forecast.test/backtest/upload"))
                 .andRespond(withException(new java.net.SocketTimeoutException("read timed out")));
 
-        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.prophetV1(
+        Map<String, Object> summary = client.runUploadBacktest(BacktestUploadRequest.xgboostResidualV1(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),

@@ -152,6 +152,7 @@ public class CsvProcessingService implements CsvProcessingJob {
             upload.setValidationSummary(toJson(result.summary()));
             upload.setRowCount((Integer) result.summary().get("total_rows"));
             upload.setDrugCount((Integer) result.summary().get("unique_dins"));
+            applyBacktestSummary(upload, backtestSummary);
             csvUploadRepository.save(upload);
             supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
         } catch (Exception ex) {
@@ -315,7 +316,7 @@ public class CsvProcessingService implements CsvProcessingJob {
         }
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
-        BacktestUploadRequest request = BacktestUploadRequest.prophetV1(
+        BacktestUploadRequest request = BacktestUploadRequest.xgboostResidualV1(
                 location.getOrganizationId(),
                 locationId,
                 uploadId,
@@ -329,6 +330,24 @@ public class CsvProcessingService implements CsvProcessingJob {
                         .toList()
         );
         return uploadBacktestPort.runUploadBacktest(request);
+    }
+
+    private void applyBacktestSummary(CsvUpload upload, Map<String, Object> backtestSummary) {
+        if (upload == null || backtestSummary == null) {
+            return;
+        }
+        Object modelVersion = backtestSummary.get("model_version");
+        if (modelVersion != null) {
+            upload.setBacktestModelVersion(modelVersion.toString());
+        }
+        Object modelPathCounts = backtestSummary.get("model_path_counts");
+        if (modelPathCounts != null) {
+            upload.setBacktestModelPathCounts(objectMapper.convertValue(
+                    modelPathCounts,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Integer>>() {
+                    }
+            ));
+        }
     }
 
     private List<ValidationError> validateRecord(CSVRecord record, Map<String, String> headers, int rowNumber) {

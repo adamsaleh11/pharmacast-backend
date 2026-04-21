@@ -99,6 +99,12 @@ public class ForecastUploadBacktestClient implements UploadBacktestPort {
         summary.put("baseline_last_7_day_avg_mae", null);
         summary.put("baseline_last_14_day_avg_mae", null);
         summary.put("rows_evaluated", null);
+        summary.put("raw_rows_received", null);
+        summary.put("usable_rows", null);
+        summary.put("min_required_rows", null);
+        summary.put("date_range", null);
+        summary.put("ready_for_forecast", false);
+        summary.put("model_path_counts", Map.of());
         summary.put("din_count", null);
         summary.put("generated_at", OffsetDateTime.now(ZoneOffset.UTC).toString());
         summary.put("error_message", errorMessage);

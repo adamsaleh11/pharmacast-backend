@@ -25,6 +25,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ForecastService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final java.util.Set<String> ALLOWED_MODEL_PATH_VALUES = java.util.Set.of(
+            "xgboost_residual_interval",
+            "fallback_recent_trend",
+            "fallback_unsafe_xgboost_output",
+            "prophet",
+            "fallback_unsafe_prophet_output"
+    );
 
     private final ForecastRequestAssembler forecastRequestAssembler;
     private final ForecastServiceClient forecastServiceClient;
@@ -69,6 +76,17 @@ public class ForecastService {
                             .formatted(result.din(), result.prophetLower(), result.prophetUpper())
             );
         }
+        if (result.modelPath() == null || result.modelPath().isBlank()) {
+            throw new InvalidForecastResultException(
+                    "Forecast service returned an empty model path for din %s".formatted(result.din())
+            );
+        }
+        if (!ALLOWED_MODEL_PATH_VALUES.contains(result.modelPath())) {
+            throw new InvalidForecastResultException(
+                    "Forecast service returned an invalid model path for din %s: %s"
+                            .formatted(result.din(), result.modelPath())
+            );
+        }
         Forecast forecast = forecastRepository.findTopByLocationIdAndDinOrderByGeneratedAtDesc(locationId, result.din())
                 .orElseGet(Forecast::new);
         forecast.setLocationId(locationId);
@@ -79,6 +97,7 @@ public class ForecastService {
         forecast.setConfidence(ForecastConfidence.valueOf(result.confidence().toLowerCase()));
         forecast.setDaysOfSupply(BigDecimal.valueOf(result.daysOfSupply()));
         forecast.setReorderStatus(ReorderStatus.valueOf(result.reorderStatus().toLowerCase()));
+        forecast.setModelPath(result.modelPath());
         forecast.setProphetLower(BigDecimal.valueOf(result.prophetLower()));
         forecast.setProphetUpper(BigDecimal.valueOf(result.prophetUpper()));
         forecast.setAvgDailyDemand(BigDecimal.valueOf(result.avgDailyDemand()));
