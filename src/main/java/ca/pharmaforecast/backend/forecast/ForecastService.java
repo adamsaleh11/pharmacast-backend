@@ -1,8 +1,8 @@
 package ca.pharmaforecast.backend.forecast;
 
+import ca.pharmaforecast.backend.common.exception.InsufficientDataException;
 import ca.pharmaforecast.backend.common.exception.NoStockEnteredException;
-import ca.pharmaforecast.backend.common.exception.StockNotSetException;
-import ca.pharmaforecast.backend.currentstock.CurrentStock;
+import ca.pharmaforecast.backend.forecast.InvalidForecastResultException;
 import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,21 +51,24 @@ public class ForecastService {
     }
 
     public ForecastRequest buildForecastRequest(UUID locationId, String din, Integer horizonDays) {
-        CurrentStock stock = currentStockRepository.findByLocationIdAndDin(locationId, din)
-                .orElseThrow(() -> new StockNotSetException(din));
-        ForecastRequest request = forecastRequestAssembler.build(locationId, din, horizonDays);
-        return new ForecastRequest(
-                request.locationId(),
-                request.din(),
-                request.horizonDays(),
-                stock.getQuantity(),
-                request.leadTimeDays(),
-                request.safetyMultiplier(),
-                request.supplementalHistory()
-        );
+        return forecastRequestAssembler.build(locationId, din, horizonDays);
     }
 
     public Forecast persistForecast(UUID locationId, ForecastResult result) {
+        if (result.dataPointsUsed() == null || result.dataPointsUsed() < 14) {
+            throw new InsufficientDataException();
+        }
+        if (result.prophetLower() == null || result.prophetUpper() == null) {
+            throw new InvalidForecastResultException(
+                    "Forecast service returned an incomplete Prophet interval for din %s".formatted(result.din())
+            );
+        }
+        if (result.prophetLower() > result.prophetUpper()) {
+            throw new InvalidForecastResultException(
+                    "Forecast service returned an invalid Prophet interval for din %s: lower=%d upper=%d"
+                            .formatted(result.din(), result.prophetLower(), result.prophetUpper())
+            );
+        }
         Forecast forecast = forecastRepository.findTopByLocationIdAndDinOrderByGeneratedAtDesc(locationId, result.din())
                 .orElseGet(Forecast::new);
         forecast.setLocationId(locationId);
@@ -113,7 +116,7 @@ public class ForecastService {
                 }
                 String payload = trimmed.substring("data:".length()).trim();
                 JsonNode node = OBJECT_MAPPER.readTree(payload);
-                if ("done".equalsIgnoreCase(text(node, "status"))) {
+                if ("done".equalsIgnoreCase(text(node, "status")) || node.path("done").asBoolean(false)) {
                     onEvent.accept(new ForecastBatchEvent.Done(true, total, succeeded, failed, dinsWithoutStock.size(), dinsWithoutStock));
                     break;
                 }
@@ -123,11 +126,18 @@ public class ForecastService {
                     onEvent.accept(new ForecastBatchEvent.Error(din, text(node, "error")));
                     continue;
                 }
-                JsonNode resultNode = node.has("forecast") ? node.get("forecast") : node;
-                ForecastResult result = OBJECT_MAPPER.treeToValue(resultNode, ForecastResult.class);
-                persistForecast(locationId, result);
-                succeeded++;
-                onEvent.accept(new ForecastBatchEvent.Result(din, result));
+                try {
+                    JsonNode resultNode = node.hasNonNull("result")
+                            ? node.get("result")
+                            : node.hasNonNull("forecast") ? node.get("forecast") : node;
+                    ForecastResult result = OBJECT_MAPPER.treeToValue(resultNode, ForecastResult.class);
+                    persistForecast(locationId, result);
+                    succeeded++;
+                    onEvent.accept(new ForecastBatchEvent.Result(din, result));
+                } catch (Exception ex) {
+                    failed++;
+                    onEvent.accept(new ForecastBatchEvent.Error(din, forecastBatchErrorCode(ex)));
+                }
             }
         } catch (IOException ex) {
             onEvent.accept(new ForecastBatchEvent.Error("", "FORECAST_UNAVAILABLE"));
@@ -138,5 +148,15 @@ public class ForecastService {
     private String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || value.isNull() ? "" : value.asText();
+    }
+
+    private String forecastBatchErrorCode(Exception ex) {
+        if (ex instanceof InsufficientDataException) {
+            return "INSUFFICIENT_DATA";
+        }
+        if (ex instanceof InvalidForecastResultException) {
+            return "INVALID_FORECAST_RESULT";
+        }
+        return "FORECAST_UNAVAILABLE";
     }
 }

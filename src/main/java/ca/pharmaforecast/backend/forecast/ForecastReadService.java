@@ -2,9 +2,8 @@ package ca.pharmaforecast.backend.forecast;
 
 import ca.pharmaforecast.backend.drug.Drug;
 import ca.pharmaforecast.backend.drug.DrugRepository;
+import ca.pharmaforecast.backend.currentstock.CurrentStock;
 import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
-import ca.pharmaforecast.backend.currentstock.CurrentStock;
-import ca.pharmaforecast.backend.currentstock.CurrentStock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,8 +55,13 @@ public class ForecastReadService {
                 .map(Forecast::getDin)
                 .distinct()
                 .collect(Collectors.toMap(din -> din, din -> drugThresholdRepository.findByLocationIdAndDin(locationId, din)
-                        .map(value -> new ForecastThresholdDto(value.getLeadTimeDays(), value.getSafetyMultiplier().value()))
-                        .orElse(new ForecastThresholdDto(2, 1.0))));
+                        .map(value -> new ForecastThresholdDto(
+                                value.getLeadTimeDays(),
+                                value.getSafetyMultiplier().value(),
+                                value.getRedThresholdDays(),
+                                value.getAmberThresholdDays()
+                        ))
+                        .orElse(new ForecastThresholdDto(2, 1.0, 3, 7))));
 
         return latest.stream()
                 .filter(forecast -> matchesSearch(params.search(), forecast, drugsByDin))

@@ -1,5 +1,7 @@
 package ca.pharmaforecast.backend.common.exception;
 
+import ca.pharmaforecast.backend.forecast.ForecastServiceUnavailableException;
+import ca.pharmaforecast.backend.forecast.InvalidForecastResultException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -25,6 +27,33 @@ public class GlobalExceptionHandler {
     Map<String, String> noStockEntered(NoStockEnteredException ex) {
         return Map.of(
                 "error", "NO_STOCK_ENTERED",
+                "message", ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(InsufficientDataException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    Map<String, String> insufficientData(InsufficientDataException ex) {
+        return Map.of(
+                "error", "INSUFFICIENT_DATA",
+                "message", ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(ForecastServiceUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    Map<String, String> forecastServiceUnavailable(ForecastServiceUnavailableException ex) {
+        return Map.of(
+                "error", "FORECAST_SERVICE_UNAVAILABLE",
+                "message", ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(InvalidForecastResultException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    Map<String, String> invalidForecastResult(InvalidForecastResultException ex) {
+        return Map.of(
+                "error", "INVALID_FORECAST_RESULT",
                 "message", ex.getMessage()
         );
     }

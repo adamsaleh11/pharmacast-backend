@@ -1,5 +1,7 @@
 package ca.pharmaforecast.backend.forecast;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -9,38 +11,68 @@ import org.springframework.web.client.RestClient;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class ForecastServiceClient {
 
+    private static final String PATCHED_CODE_PATH = "weekly-normalized-samples-v2";
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(35);
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(ForecastServiceClient.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final RestClient restClient;
+    private final String baseUrl;
 
+    @Autowired
     public ForecastServiceClient(@Value("${pharmaforecast.forecast-service-url:}") String baseUrl) {
+        this.baseUrl = baseUrl == null ? "" : baseUrl;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
         requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
         this.restClient = RestClient.builder()
-                .baseUrl(baseUrl == null ? "" : baseUrl)
+                .baseUrl(this.baseUrl)
                 .requestFactory(requestFactory)
                 .build();
     }
 
+    public ForecastServiceClient(RestClient restClient, String baseUrl) {
+        this.restClient = restClient;
+        this.baseUrl = baseUrl == null ? "" : baseUrl;
+    }
+
     public ForecastResult generateForecast(ForecastRequest request) {
+        if (baseUrl.isBlank()) {
+            logCall(request.locationId(), request.din(), 0, "FORECAST_SERVICE_NOT_CONFIGURED");
+            throw new ForecastServiceUnavailableException("Forecast service is not configured. Please set FORECAST_SERVICE_URL environment variable.");
+        }
         long start = System.nanoTime();
         try {
             ForecastResult result = restClient.post()
                     .uri("/forecast/drug")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
-                    .retrieve()
-                    .body(ForecastResult.class);
+                    .exchange((clientRequest, clientResponse) -> {
+                        String codePath = clientResponse.getHeaders().getFirst("X-Forecast-Code-Path");
+                        if (!PATCHED_CODE_PATH.equals(codePath)) {
+                            throw new ForecastServiceUnavailableException(
+                                    "Forecast service is not running the patched build. Expected X-Forecast-Code-Path=%s"
+                                            .formatted(PATCHED_CODE_PATH)
+                            );
+                        }
+                        try {
+                            return OBJECT_MAPPER.readValue(clientResponse.getBody(), ForecastResult.class);
+                        } catch (IOException ex) {
+                            throw new ForecastServiceUnavailableException("Forecast service response could not be parsed", ex);
+                        }
+                    });
             logCall(request.locationId(), request.din(), start, "OK");
             return result;
+        } catch (ForecastServiceUnavailableException ex) {
+            logCall(request.locationId(), request.din(), start, "FORECAST_SERVICE_UNAVAILABLE");
+            throw ex;
         } catch (Exception ex) {
             logCall(request.locationId(), request.din(), start, "FORECAST_UNAVAILABLE");
             return unavailable(request.din(), request.locationId(), request.horizonDays());

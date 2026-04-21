@@ -3,8 +3,7 @@ package ca.pharmaforecast.backend.forecast;
 import ca.pharmaforecast.backend.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -38,14 +37,14 @@ public class Forecast extends BaseEntity {
     @Column(name = "predicted_quantity", nullable = false)
     private Integer predictedQuantity;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ForecastConfidenceConverter.class)
     @Column(name = "confidence", nullable = false)
     private ForecastConfidence confidence;
 
     @Column(name = "days_of_supply", nullable = false, precision = 12, scale = 1)
     private BigDecimal daysOfSupply;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ReorderStatusConverter.class)
     @Column(name = "reorder_status", nullable = false)
     private ReorderStatus reorderStatus;
 

@@ -2,13 +2,14 @@ package ca.pharmaforecast.backend.forecast;
 
 import ca.pharmaforecast.backend.dispensing.DispensingRecord;
 import ca.pharmaforecast.backend.dispensing.DispensingRecordRepository;
+import ca.pharmaforecast.backend.common.exception.StockNotSetException;
+import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
 import ca.pharmaforecast.backend.location.Location;
 import ca.pharmaforecast.backend.location.LocationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,24 +19,26 @@ public class DefaultForecastRequestAssembler implements ForecastRequestAssembler
 
     private final LocationRepository locationRepository;
     private final DispensingRecordRepository dispensingRecordRepository;
-    private final StockAdjustmentRepository stockAdjustmentRepository;
+    private final CurrentStockRepository currentStockRepository;
     private final DrugThresholdRepository drugThresholdRepository;
 
     public DefaultForecastRequestAssembler(
             LocationRepository locationRepository,
             DispensingRecordRepository dispensingRecordRepository,
-            StockAdjustmentRepository stockAdjustmentRepository,
+            CurrentStockRepository currentStockRepository,
             DrugThresholdRepository drugThresholdRepository
     ) {
         this.locationRepository = locationRepository;
         this.dispensingRecordRepository = dispensingRecordRepository;
-        this.stockAdjustmentRepository = stockAdjustmentRepository;
+        this.currentStockRepository = currentStockRepository;
         this.drugThresholdRepository = drugThresholdRepository;
     }
 
     @Override
     public ForecastRequest build(UUID locationId, String din, Integer horizonDays) {
-        int quantityOnHand = getEffectiveStock(locationId, din);
+        int quantityOnHand = currentStockRepository.findByLocationIdAndDin(locationId, din)
+                .map(currentStock -> currentStock.getQuantity() == null ? 0 : currentStock.getQuantity())
+                .orElseThrow(() -> new StockNotSetException(din));
         ForecastThreshold threshold = drugThresholdRepository.findByLocationIdAndDin(locationId, din)
                 .map(ForecastThreshold::from)
                 .orElseGet(ForecastThreshold::defaults);
@@ -47,14 +50,10 @@ public class DefaultForecastRequestAssembler implements ForecastRequestAssembler
                 quantityOnHand,
                 threshold.leadTimeDays(),
                 threshold.safetyMultiplier().value(),
+                threshold.redThresholdDays(),
+                threshold.amberThresholdDays(),
                 supplementalHistory
         );
-    }
-
-    int getEffectiveStock(UUID locationId, String din) {
-        return dispensingRecordRepository.findTopByLocationIdAndDinOrderByDispensedDateDesc(locationId, din)
-                .map(latest -> latest.getQuantityOnHand() + laterStockAdjustments(locationId, din, latest.getDispensedDate()))
-                .orElse(0);
     }
 
     List<WeeklyQuantityDto> getNetworkSupplementalHistory(UUID locationId, String din) {
@@ -80,24 +79,22 @@ public class DefaultForecastRequestAssembler implements ForecastRequestAssembler
                 .toList();
     }
 
-    private int laterStockAdjustments(UUID locationId, String din, LocalDate cutoff) {
-        return stockAdjustmentRepository.findByLocationIdAndDinAndAdjustedAtAfter(locationId, din, cutoff.atStartOfDay().toInstant(ZoneOffset.UTC))
-                .stream()
-                .mapToInt(StockAdjustment::getAdjustmentQuantity)
-                .sum();
-    }
-
     private LocalDate mondayOf(LocalDate date) {
         return date.with(java.time.DayOfWeek.MONDAY);
     }
 
-    record ForecastThreshold(Integer leadTimeDays, SafetyMultiplier safetyMultiplier) {
+    record ForecastThreshold(Integer leadTimeDays, SafetyMultiplier safetyMultiplier, Integer redThresholdDays, Integer amberThresholdDays) {
         static ForecastThreshold defaults() {
-            return new ForecastThreshold(2, SafetyMultiplier.balanced);
+            return new ForecastThreshold(2, SafetyMultiplier.balanced, 3, 7);
         }
 
         static ForecastThreshold from(DrugThreshold threshold) {
-            return new ForecastThreshold(threshold.getLeadTimeDays(), threshold.getSafetyMultiplier());
+            return new ForecastThreshold(
+                    threshold.getLeadTimeDays(),
+                    threshold.getSafetyMultiplier(),
+                    threshold.getRedThresholdDays(),
+                    threshold.getAmberThresholdDays()
+            );
         }
     }
 }

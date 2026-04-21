@@ -10,7 +10,11 @@ import ca.pharmaforecast.backend.drug.DinNormalizer;
 import ca.pharmaforecast.backend.drug.DinEnrichmentService;
 import ca.pharmaforecast.backend.drug.Drug;
 import ca.pharmaforecast.backend.drug.DrugRepository;
+import ca.pharmaforecast.backend.location.Location;
+import ca.pharmaforecast.backend.location.LocationRepository;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
+import ca.pharmaforecast.backend.upload.BacktestUploadRequest;
+import ca.pharmaforecast.backend.upload.UploadBacktestPort;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -21,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,6 +43,110 @@ class CsvProcessingServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DinNormalizer dinNormalizer = new DinNormalizer();
+
+    @Test
+    void successfulUploadRunsBacktestWithPatientFreeRowsAndStoresSummary() throws Exception {
+        UUID organizationId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        CsvUpload upload = upload(uploadId, locationId);
+        CsvUploadRepository uploadRepository = mock(CsvUploadRepository.class);
+        DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
+        SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
+        DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
+        LocationRepository locationRepository = mock(LocationRepository.class);
+        UploadBacktestPort backtestPort = mock(UploadBacktestPort.class);
+        when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId)));
+        Map<String, Object> backtestSummary = new java.util.LinkedHashMap<>();
+        backtestSummary.put("status", "PASS");
+        backtestSummary.put("model_version", "prophet_v1");
+        backtestSummary.put("wape", 0.12);
+        backtestSummary.put("rows_evaluated", 2);
+        backtestSummary.put("generated_at", "2026-04-21T05:00:00+00:00");
+        backtestSummary.put("error_message", null);
+        when(backtestPort.runUploadBacktest(org.mockito.ArgumentMatchers.any())).thenReturn(backtestSummary);
+
+        CsvProcessingService service = new CsvProcessingService(
+                uploadRepository,
+                objectMapper,
+                importRepository,
+                realtimeClient,
+                dinEnrichmentService,
+                dinNormalizer,
+                drugRepository,
+                locationRepository,
+                backtestPort
+        );
+
+        service.process(uploadId, locationId, """
+                dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit,patient_id
+                2026-04-19,123,3,20,1.25,patient-123
+                2026-04-20,00099999,4,16,0.55,patient-456
+                """.getBytes(StandardCharsets.UTF_8));
+
+        ArgumentCaptor<BacktestUploadRequest> request = ArgumentCaptor.forClass(BacktestUploadRequest.class);
+        verify(backtestPort).runUploadBacktest(request.capture());
+
+        assertThat(request.getValue().organizationId()).isEqualTo(organizationId);
+        assertThat(request.getValue().locationId()).isEqualTo(locationId);
+        assertThat(request.getValue().csvUploadId()).isEqualTo(uploadId);
+        assertThat(request.getValue().rows()).extracting("din").containsExactly("00000123", "00099999");
+        assertThat(objectMapper.writeValueAsString(request.getValue())).doesNotContain("patient");
+
+        JsonNode summary = objectMapper.readTree(upload.getValidationSummary());
+        assertThat(summary.get("total_rows").asInt()).isEqualTo(2);
+        assertThat(summary.get("backtest").get("status").asText()).isEqualTo("PASS");
+        assertThat(summary.get("backtest").get("wape").asDouble()).isEqualTo(0.12);
+        verify(realtimeClient).broadcastUploadComplete(eq(locationId), eq(uploadId), eq(CsvUploadStatus.SUCCESS), eq(upload.getValidationSummary()));
+    }
+
+    @Test
+    void unexpectedProcessingFailureMarksUploadErrorInsteadOfLeavingPending() throws Exception {
+        UUID organizationId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        CsvUpload upload = upload(uploadId, locationId);
+        CsvUploadRepository uploadRepository = mock(CsvUploadRepository.class);
+        DispensingRecordImportRepository importRepository = mock(DispensingRecordImportRepository.class);
+        SupabaseRealtimeClient realtimeClient = mock(SupabaseRealtimeClient.class);
+        DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
+        DrugRepository drugRepository = mock(DrugRepository.class);
+        LocationRepository locationRepository = mock(LocationRepository.class);
+        UploadBacktestPort backtestPort = mock(UploadBacktestPort.class);
+        when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId)));
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom"))
+                .when(dinEnrichmentService)
+                .enrichSync(org.mockito.ArgumentMatchers.anyList());
+
+        CsvProcessingService service = new CsvProcessingService(
+                uploadRepository,
+                objectMapper,
+                importRepository,
+                realtimeClient,
+                dinEnrichmentService,
+                dinNormalizer,
+                drugRepository,
+                locationRepository,
+                backtestPort
+        );
+
+        service.process(uploadId, locationId, """
+                dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit,patient_id
+                2026-04-19,123,3,20,1.25,patient-123
+                """.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(upload.getStatus()).isEqualTo(CsvUploadStatus.ERROR);
+        assertThat(upload.getErrorMessage()).isEqualTo("CSV processing failed. Please try uploading again.");
+        JsonNode summary = objectMapper.readTree(upload.getValidationSummary());
+        assertThat(summary.get("total_rows").asInt()).isEqualTo(1);
+        assertThat(summary.get("processing_error").asText()).isEqualTo("upload_processing_failed");
+        verify(importRepository, never()).upsertAll(anyList());
+        verify(backtestPort, never()).runUploadBacktest(org.mockito.ArgumentMatchers.any());
+        verify(realtimeClient).broadcastUploadComplete(eq(locationId), eq(uploadId), eq(CsvUploadStatus.ERROR), eq(upload.getValidationSummary()));
+    }
 
     @Test
     void missingMandatoryColumnMarksUploadErrorWithSafeValidationDetails() throws Exception {
@@ -212,10 +321,11 @@ DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
         ArgumentCaptor<List<DailyDispensingRecord>> records = ArgumentCaptor.forClass((Class<List<DailyDispensingRecord>>) (Class<?>) List.class);
         verify(importRepository).upsertAll(records.capture());
 
-        assertThat(records.getValue()).containsExactly(
-                new DailyDispensingRecord(locationId, "00012345", LocalDate.parse("2026-04-19"), 3, 20, null)
+        assertThat(records.getValue()).containsExactlyInAnyOrder(
+                new DailyDispensingRecord(locationId, "00000123", LocalDate.parse("2026-04-20"), 10, 5, new BigDecimal("0.50")),
+                new DailyDispensingRecord(locationId, "00099999", LocalDate.parse("2026-04-20"), 20, 15, new BigDecimal("1.00"))
         );
-        verify(dinEnrichmentService).enrichSync(List.of("00012345"));
+        verify(dinEnrichmentService).enrichSync(List.of("00000123", "00099999"));
     }
 
     @Test
@@ -242,8 +352,8 @@ DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
 
         service.process(uploadId, locationId, """
                 dispensed_date,din,quantity_dispensed,quantity_on_hand,cost_per_unit
-                2026-04-20,00012345,3,20,0.50
-                2026-04-19,00012345,3,20,0.50
+                20/04/2026,00012345,3,20,0.50
+                04/05/2026,00012345,3,20,0.50
                 """.getBytes(StandardCharsets.UTF_8));
 
         assertThat(upload.getStatus()).isEqualTo(CsvUploadStatus.ERROR);
@@ -265,5 +375,14 @@ DinEnrichmentService dinEnrichmentService = mock(DinEnrichmentService.class);
         upload.setStatus(CsvUploadStatus.PENDING);
         upload.setUploadedAt(Instant.parse("2026-04-19T12:00:00Z"));
         return upload;
+    }
+
+    private Location location(UUID id, UUID organizationId) throws Exception {
+        Location location = ReflectionUtils.accessibleConstructor(Location.class).newInstance();
+        ReflectionTestUtils.setField(location, "id", id);
+        ReflectionTestUtils.setField(location, "organizationId", organizationId);
+        ReflectionTestUtils.setField(location, "name", "Main Pharmacy");
+        ReflectionTestUtils.setField(location, "address", "100 Bank St, Ottawa, ON");
+        return location;
     }
 }

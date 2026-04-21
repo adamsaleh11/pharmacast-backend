@@ -16,6 +16,10 @@ public record ForecastRequest(
         Integer leadTimeDays,
         @JsonProperty("safety_multiplier")
         Double safetyMultiplier,
+        @JsonProperty("red_threshold_days")
+        Integer redThresholdDays,
+        @JsonProperty("amber_threshold_days")
+        Integer amberThresholdDays,
         @JsonProperty("supplemental_history")
         List<WeeklyQuantityDto> supplementalHistory
 ) {

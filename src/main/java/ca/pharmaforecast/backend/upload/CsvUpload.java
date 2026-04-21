@@ -3,8 +3,7 @@ package ca.pharmaforecast.backend.upload;
 import ca.pharmaforecast.backend.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,7 +29,7 @@ public class CsvUpload extends BaseEntity {
     @Column(name = "filename", nullable = false)
     private String filename;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = CsvUploadStatusConverter.class)
     @Column(name = "status", nullable = false)
     private CsvUploadStatus status;
 

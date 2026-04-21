@@ -47,6 +47,14 @@ public class DrugThreshold extends BaseEntity {
         return leadTimeDays;
     }
 
+    public Integer getRedThresholdDays() {
+        return redThresholdDays;
+    }
+
+    public Integer getAmberThresholdDays() {
+        return amberThresholdDays;
+    }
+
     public SafetyMultiplier getSafetyMultiplier() {
         return safetyMultiplier;
     }

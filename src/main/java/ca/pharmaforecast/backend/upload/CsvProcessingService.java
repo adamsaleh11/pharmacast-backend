@@ -7,12 +7,15 @@ import ca.pharmaforecast.backend.drug.DinNormalizer;
 import ca.pharmaforecast.backend.drug.Drug;
 import ca.pharmaforecast.backend.drug.DrugRepository;
 import ca.pharmaforecast.backend.drug.InvalidDinException;
+import ca.pharmaforecast.backend.location.Location;
+import ca.pharmaforecast.backend.location.LocationRepository;
 import ca.pharmaforecast.backend.realtime.SupabaseRealtimeClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -37,9 +40,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class CsvProcessingService implements CsvProcessingJob {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CsvProcessingService.class);
+    private static final String PROCESSING_FAILURE_MESSAGE = "CSV processing failed. Please try uploading again.";
 
     private static final List<String> MANDATORY_COLUMNS = List.of(
             "dispensed_date",
@@ -57,6 +65,31 @@ public class CsvProcessingService implements CsvProcessingJob {
     private final DinEnrichmentService dinEnrichmentService;
     private final DinNormalizer dinNormalizer;
     private final DrugRepository drugRepository;
+    private final LocationRepository locationRepository;
+    private final UploadBacktestPort uploadBacktestPort;
+
+    @Autowired
+    public CsvProcessingService(
+            CsvUploadRepository csvUploadRepository,
+            ObjectMapper objectMapper,
+            DispensingRecordImportRepository dispensingRecordImportRepository,
+            SupabaseRealtimeClient supabaseRealtimeClient,
+            DinEnrichmentService dinEnrichmentService,
+            DinNormalizer dinNormalizer,
+            DrugRepository drugRepository,
+            LocationRepository locationRepository,
+            UploadBacktestPort uploadBacktestPort
+    ) {
+        this.csvUploadRepository = csvUploadRepository;
+        this.objectMapper = objectMapper;
+        this.dispensingRecordImportRepository = dispensingRecordImportRepository;
+        this.supabaseRealtimeClient = supabaseRealtimeClient;
+        this.dinEnrichmentService = dinEnrichmentService;
+        this.dinNormalizer = dinNormalizer;
+        this.drugRepository = drugRepository;
+        this.locationRepository = locationRepository;
+        this.uploadBacktestPort = uploadBacktestPort;
+    }
 
     public CsvProcessingService(
             CsvUploadRepository csvUploadRepository,
@@ -67,13 +100,17 @@ public class CsvProcessingService implements CsvProcessingJob {
             DinNormalizer dinNormalizer,
             DrugRepository drugRepository
     ) {
-        this.csvUploadRepository = csvUploadRepository;
-        this.objectMapper = objectMapper;
-        this.dispensingRecordImportRepository = dispensingRecordImportRepository;
-        this.supabaseRealtimeClient = supabaseRealtimeClient;
-        this.dinEnrichmentService = dinEnrichmentService;
-        this.dinNormalizer = dinNormalizer;
-        this.drugRepository = drugRepository;
+        this(
+                csvUploadRepository,
+                objectMapper,
+                dispensingRecordImportRepository,
+                supabaseRealtimeClient,
+                dinEnrichmentService,
+                dinNormalizer,
+                drugRepository,
+                null,
+                request -> null
+        );
     }
 
     @Transactional
@@ -84,33 +121,47 @@ public class CsvProcessingService implements CsvProcessingJob {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Upload not found"));
         upload.setStatus(CsvUploadStatus.PROCESSING);
 
-        ValidationResult result = validate(csvBytes);
-        if (!result.errors().isEmpty()) {
-            upload.setStatus(CsvUploadStatus.ERROR);
-            upload.setErrorMessage(toJson(result.errors()));
+        ValidationResult result = null;
+        try {
+            result = validate(csvBytes);
+            if (!result.errors().isEmpty()) {
+                upload.setStatus(CsvUploadStatus.ERROR);
+                upload.setErrorMessage(toJson(result.errors()));
+                upload.setValidationSummary(toJson(result.summary()));
+                csvUploadRepository.save(upload);
+                supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
+                return;
+            }
+
+            dinEnrichmentService.enrichSync(result.validRows().stream()
+                    .map(ValidCsvRow::din)
+                    .distinct()
+                    .toList());
+
+            ensureDinsExistInDb(result.validRows().stream()
+                    .map(ValidCsvRow::din)
+                    .distinct()
+                    .toList());
+
+            dispensingRecordImportRepository.upsertAll(aggregate(locationId, result.validRows()));
+            Map<String, Object> backtestSummary = runUploadBacktest(uploadId, locationId, result.validRows());
+            if (backtestSummary != null) {
+                result.summary().put("backtest", backtestSummary);
+            }
+            upload.setStatus(CsvUploadStatus.SUCCESS);
             upload.setValidationSummary(toJson(result.summary()));
+            upload.setRowCount((Integer) result.summary().get("total_rows"));
+            upload.setDrugCount((Integer) result.summary().get("unique_dins"));
             csvUploadRepository.save(upload);
             supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
-            return;
+        } catch (Exception ex) {
+            LOGGER.warn("csv upload processing failed uploadId={} locationId={} error={}", uploadId, locationId, ex.toString());
+            upload.setStatus(CsvUploadStatus.ERROR);
+            upload.setErrorMessage(PROCESSING_FAILURE_MESSAGE);
+            upload.setValidationSummary(toJson(buildProcessingFailureSummary(result)));
+            csvUploadRepository.save(upload);
+            supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
         }
-
-        dinEnrichmentService.enrichSync(result.validRows().stream()
-                .map(ValidCsvRow::din)
-                .distinct()
-                .toList());
-
-        ensureDinsExistInDb(result.validRows().stream()
-                .map(ValidCsvRow::din)
-                .distinct()
-                .toList());
-
-        dispensingRecordImportRepository.upsertAll(aggregate(locationId, result.validRows()));
-        upload.setStatus(CsvUploadStatus.SUCCESS);
-        upload.setValidationSummary(toJson(result.summary()));
-        upload.setRowCount((Integer) result.summary().get("total_rows"));
-        upload.setDrugCount((Integer) result.summary().get("unique_dins"));
-        csvUploadRepository.save(upload);
-        supabaseRealtimeClient.broadcastUploadComplete(locationId, uploadId, upload.getStatus(), upload.getValidationSummary());
     }
 
     private ValidationResult validate(byte[] csvBytes) {
@@ -256,6 +307,28 @@ public class CsvProcessingService implements CsvProcessingJob {
                         entry.getValue().costPerUnit()
                 ))
                 .toList();
+    }
+
+    private Map<String, Object> runUploadBacktest(UUID uploadId, UUID locationId, List<ValidCsvRow> rows) {
+        if (locationRepository == null) {
+            return null;
+        }
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+        BacktestUploadRequest request = BacktestUploadRequest.prophetV1(
+                location.getOrganizationId(),
+                locationId,
+                uploadId,
+                rows.stream()
+                        .map(row -> new BacktestDemandRow(
+                                row.dispensedDate().toString(),
+                                row.din(),
+                                row.quantityDispensed(),
+                                row.costPerUnit()
+                        ))
+                        .toList()
+        );
+        return uploadBacktestPort.runUploadBacktest(request);
     }
 
     private List<ValidationError> validateRecord(CSVRecord record, Map<String, String> headers, int rowNumber) {
@@ -408,6 +481,21 @@ public class CsvProcessingService implements CsvProcessingJob {
             normalized.put(header.toLowerCase(Locale.ROOT), header);
         }
         return normalized;
+    }
+
+    private Map<String, Object> buildProcessingFailureSummary(ValidationResult result) {
+        Map<String, Object> summary = result == null ? new LinkedHashMap<>() : new LinkedHashMap<>(result.summary());
+        if (summary.isEmpty()) {
+            summary.put("total_rows", 0);
+            summary.put("valid_rows", 0);
+            summary.put("invalid_rows", 0);
+            summary.put("unique_dins", 0);
+            summary.put("date_range_start", null);
+            summary.put("date_range_end", null);
+            summary.put("warnings", List.of());
+        }
+        summary.put("processing_error", "upload_processing_failed");
+        return summary;
     }
 
     private void ensureDinsExistInDb(List<String> dins) {
