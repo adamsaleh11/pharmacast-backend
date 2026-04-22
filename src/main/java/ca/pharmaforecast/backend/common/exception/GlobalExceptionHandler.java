@@ -1,5 +1,8 @@
 package ca.pharmaforecast.backend.common.exception;
 
+import ca.pharmaforecast.backend.llm.ExplainStockNotSetException;
+import ca.pharmaforecast.backend.llm.ForecastNotFoundException;
+import ca.pharmaforecast.backend.llm.LlmUnavailableException;
 import ca.pharmaforecast.backend.forecast.ForecastServiceUnavailableException;
 import ca.pharmaforecast.backend.forecast.InvalidForecastResultException;
 import org.springframework.http.HttpStatus;
@@ -55,6 +58,33 @@ public class GlobalExceptionHandler {
         return Map.of(
                 "error", "INVALID_FORECAST_RESULT",
                 "message", ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(ForecastNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    Map<String, String> forecastNotFound(ForecastNotFoundException ex) {
+        return Map.of(
+                "error", "FORECAST_NOT_FOUND",
+                "message", "Generate a forecast first"
+        );
+    }
+
+    @ExceptionHandler(ExplainStockNotSetException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    Map<String, String> explainStockNotSet(ExplainStockNotSetException ex) {
+        return Map.of(
+                "error", "STOCK_NOT_SET",
+                "message", "Enter current stock before explaining"
+        );
+    }
+
+    @ExceptionHandler(LlmUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    Map<String, String> llmUnavailable(LlmUnavailableException ex) {
+        return Map.of(
+                "error", "LLM_UNAVAILABLE",
+                "message", "Try again in a moment"
         );
     }
 }

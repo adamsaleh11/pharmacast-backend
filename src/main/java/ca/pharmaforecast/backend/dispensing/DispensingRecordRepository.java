@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface DispensingRecordRepository extends JpaRepository<DispensingRecord, UUID> {
     Optional<DispensingRecord> findTopByLocationIdAndDinOrderByDispensedDateDesc(UUID locationId, String din);
+    List<DispensingRecord> findByLocationId(UUID locationId);
 
     @Query("select distinct record.locationId from DispensingRecord record where record.din = :din")
     List<UUID> findDistinctLocationIdsByDin(@Param("din") String din);

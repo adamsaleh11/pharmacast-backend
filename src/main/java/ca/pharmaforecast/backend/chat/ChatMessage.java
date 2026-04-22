@@ -30,4 +30,39 @@ public class ChatMessage extends BaseEntity {
 
     @Column(name = "content", nullable = false)
     private String content;
+
+    @Column(name = "stream_error", nullable = false)
+    private boolean streamError;
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public ChatRole getRole() {
+        return role;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public boolean isStreamError() {
+        return streamError;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public void setRole(ChatRole role) {
+        this.role = role;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public void setStreamError(boolean streamError) {
+        this.streamError = streamError;
+    }
 }

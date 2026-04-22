@@ -4,6 +4,8 @@ import ca.pharmaforecast.backend.auth.AuthenticatedUserPrincipal;
 import ca.pharmaforecast.backend.auth.CurrentUserService;
 import ca.pharmaforecast.backend.common.exception.NoStockEnteredException;
 import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
+import ca.pharmaforecast.backend.llm.ExplainResponse;
+import ca.pharmaforecast.backend.llm.ExplainService;
 import ca.pharmaforecast.backend.location.Location;
 import ca.pharmaforecast.backend.location.LocationRepository;
 import jakarta.validation.Valid;
@@ -32,19 +34,22 @@ public class ForecastController {
     private final CurrentStockRepository currentStockRepository;
     private final ForecastService forecastService;
     private final ForecastReadService forecastReadService;
+    private final ExplainService explainService;
 
     public ForecastController(
             CurrentUserService currentUserService,
             LocationRepository locationRepository,
             CurrentStockRepository currentStockRepository,
             ForecastService forecastService,
-            ForecastReadService forecastReadService
+            ForecastReadService forecastReadService,
+            ExplainService explainService
     ) {
         this.currentUserService = currentUserService;
         this.locationRepository = locationRepository;
         this.currentStockRepository = currentStockRepository;
         this.forecastService = forecastService;
         this.forecastReadService = forecastReadService;
+        this.explainService = explainService;
     }
 
     @PostMapping("/generate")
@@ -87,6 +92,15 @@ public class ForecastController {
     ) {
         validateLocationOwnership(locationId);
         return forecastReadService.getLatestForecasts(locationId, params == null ? ForecastQueryParams.defaults() : params);
+    }
+
+    @PostMapping("/{din}/explain")
+    public ExplainResponse explain(
+            @PathVariable UUID locationId,
+            @PathVariable String din
+    ) {
+        validateLocationOwnership(locationId);
+        return explainService.getExplanation(locationId, din);
     }
 
     private void validateLocationOwnership(UUID locationId) {

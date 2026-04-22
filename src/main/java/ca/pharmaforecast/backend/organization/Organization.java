@@ -30,4 +30,8 @@ public class Organization extends BaseEntity {
 
     @Column(name = "trial_ends_at")
     private Instant trialEndsAt;
+
+    public String getName() {
+        return name;
+    }
 }

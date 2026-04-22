@@ -75,6 +75,11 @@ spring:
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     hikari:
+      connection-timeout: 30000
+      validation-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1500000
+      keepalive-time: 300000
       data-source-properties:
         prepareThreshold: 0
   flyway:
