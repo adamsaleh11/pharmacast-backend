@@ -38,9 +38,10 @@ class ChatServiceTest {
                 UserRole.owner
         ));
         when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId)));
-        when(chatMessageRepository.findTop50ByLocationIdOrderByCreatedAtDesc(locationId)).thenReturn(List.of(
-                chatMessage(locationId, ChatRole.assistant, "Second", Instant.parse("2026-04-21T10:01:00Z")),
-                chatMessage(locationId, ChatRole.user, "First", Instant.parse("2026-04-21T10:00:00Z"))
+        UUID conversationId = UUID.randomUUID();
+        when(chatMessageRepository.findTop500ByLocationIdAndUserIdOrderByCreatedAtDesc(locationId, userId)).thenReturn(List.of(
+                chatMessage(locationId, conversationId, userId, ChatRole.assistant, "Second", Instant.parse("2026-04-21T10:01:00Z")),
+                chatMessage(locationId, conversationId, userId, ChatRole.user, "First", Instant.parse("2026-04-21T10:00:00Z"))
         ));
 
         ChatService service = new ChatService(
@@ -114,10 +115,12 @@ class ChatServiceTest {
         return location;
     }
 
-    private ChatMessage chatMessage(UUID locationId, ChatRole role, String content, Instant createdAt) throws Exception {
+    private ChatMessage chatMessage(UUID locationId, UUID conversationId, UUID userId, ChatRole role, String content, Instant createdAt) throws Exception {
         ChatMessage message = org.springframework.util.ReflectionUtils.accessibleConstructor(ChatMessage.class).newInstance();
         ReflectionTestUtils.setField(message, "id", UUID.randomUUID());
         ReflectionTestUtils.setField(message, "locationId", locationId);
+        ReflectionTestUtils.setField(message, "conversationId", conversationId);
+        ReflectionTestUtils.setField(message, "userId", userId);
         ReflectionTestUtils.setField(message, "role", role);
         ReflectionTestUtils.setField(message, "content", content);
         ReflectionTestUtils.setField(message, "createdAt", createdAt);

@@ -2,6 +2,7 @@ package ca.pharmaforecast.backend;
 
 import ca.pharmaforecast.backend.auth.User;
 import ca.pharmaforecast.backend.auth.UserRole;
+import ca.pharmaforecast.backend.chat.ChatConversationResponse;
 import ca.pharmaforecast.backend.chat.ChatMessageResponse;
 import ca.pharmaforecast.backend.chat.ChatRole;
 import ca.pharmaforecast.backend.chat.ChatService;
@@ -77,12 +78,13 @@ class ChatControllerTest {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
         AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId, "Main Pharmacy", "100 Bank St, Ottawa, ON")));
 
         when(chatService.getHistory(locationId)).thenReturn(List.of(
-                new ChatMessageResponse(UUID.randomUUID(), ChatRole.user, "Hello", Instant.parse("2026-04-21T10:00:00Z")),
-                new ChatMessageResponse(UUID.randomUUID(), ChatRole.assistant, "Hi there", Instant.parse("2026-04-21T10:00:01Z"))
+                new ChatMessageResponse(UUID.randomUUID(), conversationId, userId, ChatRole.user, "Hello", Instant.parse("2026-04-21T10:00:00Z")),
+                new ChatMessageResponse(UUID.randomUUID(), conversationId, userId, ChatRole.assistant, "Hi there", Instant.parse("2026-04-21T10:00:01Z"))
         ));
 
         mockMvc.perform(get("/locations/{locationId}/chat/history", locationId)
@@ -94,6 +96,40 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$[0].content").value("Hello"))
                 .andExpect(jsonPath("$[1].role").value("assistant"))
                 .andExpect(jsonPath("$[1].created_at").value("2026-04-21T10:00:01Z"));
+    }
+
+    @Test
+    void conversationListEndpointReturnsPastChatsForOwnedLocation() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
+        AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId, "Main Pharmacy", "100 Bank St, Ottawa, ON")));
+
+        when(chatService.listConversations(locationId)).thenReturn(List.of(
+                new ChatConversationResponse(
+                        conversationId,
+                        locationId,
+                        userId,
+                        Instant.parse("2026-04-21T10:00:00Z"),
+                        Instant.parse("2026-04-21T10:05:00Z"),
+                        4
+                )
+        ));
+
+        mockMvc.perform(get("/locations/{locationId}/chat/conversations", locationId)
+                        .with(jwt().jwt(token -> token
+                                .subject(userId.toString())
+                                .claim("email", "owner@example.com")
+                                .audience(List.of("authenticated")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].conversation_id").value(conversationId.toString()))
+                .andExpect(jsonPath("$[0].location_id").value(locationId.toString()))
+                .andExpect(jsonPath("$[0].user_id").value(userId.toString()))
+                .andExpect(jsonPath("$[0].message_count").value(4))
+                .andExpect(jsonPath("$[0].started_at").value("2026-04-21T10:00:00Z"))
+                .andExpect(jsonPath("$[0].last_message_at").value("2026-04-21T10:05:00Z"));
     }
 
     private User user(UUID id, UUID organizationId, String email, UserRole role) throws Exception {

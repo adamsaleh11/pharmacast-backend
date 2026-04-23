@@ -7,6 +7,10 @@ import java.util.UUID;
 
 public record ChatMessageResponse(
         UUID id,
+        @JsonProperty("conversation_id")
+        UUID conversationId,
+        @JsonProperty("user_id")
+        UUID userId,
         ChatRole role,
         String content,
         @JsonProperty("created_at")

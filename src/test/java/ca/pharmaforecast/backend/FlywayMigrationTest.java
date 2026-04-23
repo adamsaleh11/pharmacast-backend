@@ -230,6 +230,31 @@ class FlywayMigrationTest {
         )).isEqualTo(1);
     }
 
+    @Test
+    void chatMessagesTableIncludesConversationAndUserOwnershipColumns() {
+        Flyway flyway = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration")
+                .cleanDisabled(false)
+                .load();
+        flyway.clean();
+        flyway.migrate();
+
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                postgres.getJdbcUrl(),
+                postgres.getUsername(),
+                postgres.getPassword()
+        );
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.columns
+                WHERE table_name = 'chat_messages'
+                  AND column_name IN ('conversation_id', 'user_id')
+                """, Integer.class)).isEqualTo(2);
+    }
+
     private BootstrapRow bootstrap(JdbcTemplate jdbcTemplate, UUID authUserId, String email) {
         return jdbcTemplate.queryForObject(
                 """

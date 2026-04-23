@@ -43,6 +43,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
@@ -117,6 +118,7 @@ class ChatSendControllerTest {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
         AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId)));
 
@@ -128,9 +130,9 @@ class ChatSendControllerTest {
         ));
         when(locationRepository.findById(locationId)).thenReturn(java.util.Optional.of(location(locationId, organizationId)));
         when(chatContextBuilder.buildSystemPrompt(locationId, organizationId)).thenReturn("system prompt");
-        when(chatMessageRepository.findTop50ByLocationIdOrderByCreatedAtDesc(locationId)).thenReturn(List.of(
-                chatMessage(locationId, ChatRole.assistant, "Order now", Instant.parse("2026-04-21T09:59:00Z")),
-                chatMessage(locationId, ChatRole.user, "Tell me about amoxicillin", Instant.parse("2026-04-21T09:58:00Z"))
+        when(chatMessageRepository.findTop50ByLocationIdAndConversationIdAndUserIdOrderByCreatedAtDesc(eq(locationId), any(), eq(userId))).thenReturn(List.of(
+                chatMessage(locationId, UUID.randomUUID(), userId, ChatRole.assistant, "Order now", Instant.parse("2026-04-21T09:59:00Z")),
+                chatMessage(locationId, UUID.randomUUID(), userId, ChatRole.user, "Tell me about amoxicillin", Instant.parse("2026-04-21T09:58:00Z"))
         ));
         arrangeLlmStream("""
                 data: {"token":"Hel"}
@@ -148,9 +150,10 @@ class ChatSendControllerTest {
         String request = """
                 {
                   "message": "What should I order?",
+                  "conversation_id": "%s",
                   "conversation_history": []
                 }
-                """;
+                """.formatted(conversationId);
 
         var result = mockMvc.perform(post("/locations/{locationId}/chat", locationId)
                         .with(jwt().jwt(token -> token
@@ -182,7 +185,13 @@ class ChatSendControllerTest {
         assertThat(payload.messages().get(1).get("content")).isEqualTo("Order now");
         assertThat(payload.messages().get(2).get("content")).isEqualTo("What should I order?");
 
-        verify(chatMessageRepository, times(2)).save(any(ChatMessage.class));
+        var savedCaptor = org.mockito.ArgumentCaptor.forClass(ChatMessage.class);
+        verify(chatMessageRepository, times(2)).save(savedCaptor.capture());
+        List<ChatMessage> savedMessages = savedCaptor.getAllValues();
+        assertThat(savedMessages).allSatisfy(message -> {
+            assertThat(message.getConversationId()).isEqualTo(conversationId);
+            assertThat(message.getUserId()).isEqualTo(userId);
+        });
     }
 
     @Test
@@ -190,6 +199,7 @@ class ChatSendControllerTest {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
         AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId)));
 
@@ -201,7 +211,7 @@ class ChatSendControllerTest {
         ));
         when(locationRepository.findById(locationId)).thenReturn(java.util.Optional.of(location(locationId, organizationId)));
         when(chatContextBuilder.buildSystemPrompt(locationId, organizationId)).thenReturn("system prompt");
-        when(chatMessageRepository.findTop50ByLocationIdOrderByCreatedAtDesc(locationId)).thenReturn(buildHistory(locationId, 25));
+        when(chatMessageRepository.findTop50ByLocationIdAndConversationIdAndUserIdOrderByCreatedAtDesc(eq(locationId), any(), eq(userId))).thenReturn(buildHistory(locationId, 25));
         arrangeLlmStream("""
                 data: {"done":true,"total_tokens":1}
                 """);
@@ -226,9 +236,10 @@ class ChatSendControllerTest {
         String request = """
                 {
                   "message": "What should I order?",
+                  "conversation_id": "%s",
                   "conversation_history": %s
                 }
-                """.formatted(history);
+                """.formatted(conversationId, history);
 
         mockMvc.perform(post("/locations/{locationId}/chat", locationId)
                         .with(jwt().jwt(token -> token
@@ -254,6 +265,7 @@ class ChatSendControllerTest {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
         AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId)));
 
@@ -261,9 +273,10 @@ class ChatSendControllerTest {
         String request = """
                 {
                   "message": "%s",
+                  "conversation_id": "%s",
                   "conversation_history": []
                 }
-                """.formatted(longMessage);
+                """.formatted(longMessage, conversationId);
 
         mockMvc.perform(post("/locations/{locationId}/chat", locationId)
                         .with(jwt().jwt(token -> token
@@ -280,6 +293,7 @@ class ChatSendControllerTest {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();
         UUID locationId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         AuthTestRepositoryConfig.putUser(userId, "owner@example.com", user(userId, organizationId, "owner@example.com", UserRole.owner));
         AuthTestRepositoryConfig.putLocations(organizationId, List.of(location(locationId, organizationId)));
 
@@ -303,9 +317,10 @@ class ChatSendControllerTest {
         String request = """
                 {
                   "message": "What should I order?",
+                  "conversation_id": "%s",
                   "conversation_history": []
                 }
-                """;
+                """.formatted(conversationId);
 
         mockMvc.perform(post("/locations/{locationId}/chat", locationId)
                         .with(jwt().jwt(token -> token
@@ -471,10 +486,14 @@ class ChatSendControllerTest {
 
     private List<ChatMessage> buildHistory(UUID locationId, int count) throws Exception {
         List<ChatMessage> messages = new java.util.ArrayList<>();
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
         for (int index = count; index >= 1; index--) {
             ChatRole role = index % 2 == 0 ? ChatRole.assistant : ChatRole.user;
             messages.add(chatMessage(
                     locationId,
+                    conversationId,
+                    userId,
                     role,
                     "turn-%d".formatted(index),
                     Instant.parse("2026-04-21T09:%02d:00Z".formatted(index))
@@ -493,16 +512,18 @@ class ChatSendControllerTest {
                 UserRole.owner
         ));
         when(locationRepository.findById(locationId)).thenReturn(java.util.Optional.of(location(locationId, organizationId)));
-        when(chatMessageRepository.findTop50ByLocationIdOrderByCreatedAtDesc(locationId)).thenReturn(List.of());
+        when(chatMessageRepository.findTop50ByLocationIdAndConversationIdAndUserIdOrderByCreatedAtDesc(eq(locationId), any(), eq(userId))).thenReturn(List.of());
     }
 
     private String performChatRequest(UUID locationId, UUID userId) throws Exception {
+        UUID conversationId = UUID.randomUUID();
         String request = """
                 {
                   "message": "What should I order?",
+                  "conversation_id": "%s",
                   "conversation_history": []
                 }
-                """;
+                """.formatted(conversationId);
 
         var result = mockMvc.perform(post("/locations/{locationId}/chat", locationId)
                         .with(jwt().jwt(token -> token
@@ -522,10 +543,12 @@ class ChatSendControllerTest {
                 .getContentAsString();
     }
 
-    private ChatMessage chatMessage(UUID locationId, ChatRole role, String content, Instant createdAt) throws Exception {
+    private ChatMessage chatMessage(UUID locationId, UUID conversationId, UUID userId, ChatRole role, String content, Instant createdAt) throws Exception {
         ChatMessage message = org.springframework.util.ReflectionUtils.accessibleConstructor(ChatMessage.class).newInstance();
         ReflectionTestUtils.setField(message, "id", UUID.randomUUID());
         ReflectionTestUtils.setField(message, "locationId", locationId);
+        ReflectionTestUtils.setField(message, "conversationId", conversationId);
+        ReflectionTestUtils.setField(message, "userId", userId);
         ReflectionTestUtils.setField(message, "role", role);
         ReflectionTestUtils.setField(message, "content", content);
         ReflectionTestUtils.setField(message, "streamError", false);

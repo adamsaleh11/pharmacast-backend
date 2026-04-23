@@ -273,6 +273,8 @@ ON chat_messages
 FOR ALL
 TO authenticated
 USING (
+    user_id = auth.uid()
+    AND
     location_id IN (
         SELECT l.id
         FROM public.locations l
@@ -280,6 +282,8 @@ USING (
     )
 )
 WITH CHECK (
+    user_id = auth.uid()
+    AND
     location_id IN (
         SELECT l.id
         FROM public.locations l

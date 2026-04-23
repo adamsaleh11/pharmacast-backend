@@ -2,6 +2,7 @@ package ca.pharmaforecast.backend.chat;
 
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,11 +29,27 @@ public class ChatController {
         return chatService.getHistory(locationId);
     }
 
+    @GetMapping("/conversations")
+    public List<ChatConversationResponse> conversations(@PathVariable UUID locationId) {
+        return chatService.listConversations(locationId);
+    }
+
+    @GetMapping("/{conversationId}/history")
+    public List<ChatMessageResponse> conversationHistory(
+            @PathVariable UUID locationId,
+            @PathVariable UUID conversationId
+    ) {
+        return chatService.getHistory(locationId, conversationId);
+    }
+
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter send(
+    public ResponseEntity<SseEmitter> send(
             @PathVariable UUID locationId,
             @Valid @RequestBody ChatSendRequest request
     ) {
-        return chatService.sendMessage(locationId, request);
+        ChatService.ChatSendResult result = chatService.sendMessage(locationId, request);
+        return ResponseEntity.ok()
+                .header("X-Conversation-Id", result.conversationId().toString())
+                .body(result.emitter());
     }
 }

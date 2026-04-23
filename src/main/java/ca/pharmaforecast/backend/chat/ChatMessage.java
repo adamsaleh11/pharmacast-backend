@@ -24,6 +24,12 @@ public class ChatMessage extends BaseEntity {
     @Column(name = "location_id", nullable = false)
     private UUID locationId;
 
+    @Column(name = "conversation_id", nullable = false)
+    private UUID conversationId;
+
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private ChatRole role;
@@ -36,6 +42,14 @@ public class ChatMessage extends BaseEntity {
 
     public UUID getLocationId() {
         return locationId;
+    }
+
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    public UUID getUserId() {
+        return userId;
     }
 
     public ChatRole getRole() {
@@ -52,6 +66,14 @@ public class ChatMessage extends BaseEntity {
 
     public void setLocationId(UUID locationId) {
         this.locationId = locationId;
+    }
+
+    public void setConversationId(UUID conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public void setRole(ChatRole role) {
