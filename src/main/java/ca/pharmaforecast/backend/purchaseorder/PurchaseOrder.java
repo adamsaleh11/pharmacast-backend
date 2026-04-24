@@ -40,4 +40,44 @@ public class PurchaseOrder extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PurchaseOrderStatus status;
+
+    public UUID getLocationId() {
+        return locationId;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
+    }
+
+    public Instant getGeneratedAt() {
+        return generatedAt;
+    }
+
+    public void setGeneratedAt(Instant generatedAt) {
+        this.generatedAt = generatedAt;
+    }
+
+    public String getGrokOutput() {
+        return grokOutput;
+    }
+
+    public void setGrokOutput(String grokOutput) {
+        this.grokOutput = grokOutput;
+    }
+
+    public String getLineItems() {
+        return lineItems;
+    }
+
+    public void setLineItems(String lineItems) {
+        this.lineItems = lineItems;
+    }
+
+    public PurchaseOrderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PurchaseOrderStatus status) {
+        this.status = status;
+    }
 }

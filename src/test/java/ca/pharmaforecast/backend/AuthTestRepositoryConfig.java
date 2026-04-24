@@ -16,6 +16,10 @@ import ca.pharmaforecast.backend.forecast.ForecastServiceClient;
 import ca.pharmaforecast.backend.forecast.StockAdjustmentRepository;
 import ca.pharmaforecast.backend.notification.DrugAlertEmailService;
 import ca.pharmaforecast.backend.notification.NotificationRepository;
+import ca.pharmaforecast.backend.organization.Organization;
+import ca.pharmaforecast.backend.organization.OrganizationRepository;
+import ca.pharmaforecast.backend.purchaseorder.PurchaseOrder;
+import ca.pharmaforecast.backend.purchaseorder.PurchaseOrderRepository;
 import ca.pharmaforecast.backend.upload.CsvUpload;
 import ca.pharmaforecast.backend.upload.CsvProcessingJob;
 import ca.pharmaforecast.backend.upload.CsvUploadRepository;
@@ -43,6 +47,8 @@ class AuthTestRepositoryConfig {
     static final Map<UUID, List<Location>> LOCATIONS = new HashMap<>();
     static final Map<UUID, CsvUpload> CSV_UPLOADS = new HashMap<>();
     static final Map<String, Drug> DRUGS = new HashMap<>();
+    static final Map<UUID, Organization> ORGANIZATIONS = new HashMap<>();
+    static final Map<UUID, PurchaseOrder> PURCHASE_ORDERS = new HashMap<>();
     static AuthBootstrapService.BootstrapCommand LAST_BOOTSTRAP_COMMAND;
     static AuthBootstrapService.BootstrapResult BOOTSTRAP_RESULT;
     static CapturedCsvJob LAST_CSV_JOB;
@@ -52,6 +58,8 @@ class AuthTestRepositoryConfig {
         LOCATIONS.clear();
         CSV_UPLOADS.clear();
         DRUGS.clear();
+        ORGANIZATIONS.clear();
+        PURCHASE_ORDERS.clear();
         LAST_BOOTSTRAP_COMMAND = null;
         BOOTSTRAP_RESULT = null;
         LAST_CSV_JOB = null;
@@ -73,6 +81,22 @@ class AuthTestRepositoryConfig {
     }
 
     @Bean
+    OrganizationRepository organizationRepository() {
+        return (OrganizationRepository) Proxy.newProxyInstance(
+                OrganizationRepository.class.getClassLoader(),
+                new Class<?>[]{OrganizationRepository.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findById" -> Optional.ofNullable(ORGANIZATIONS.get((UUID) args[0]));
+                    case "save" -> saveOrganization((Organization) args[0]);
+                    case "toString" -> "AuthTestOrganizationRepository";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                }
+        );
+    }
+
+    @Bean
     LocationRepository locationRepository() {
         return (LocationRepository) Proxy.newProxyInstance(
                 LocationRepository.class.getClassLoader(),
@@ -85,6 +109,29 @@ class AuthTestRepositoryConfig {
                             .filter(location -> location.getId().equals(args[0]))
                             .findFirst();
                     case "toString" -> "AuthTestLocationRepository";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                }
+        );
+    }
+
+    @Bean
+    PurchaseOrderRepository purchaseOrderRepository() {
+        return (PurchaseOrderRepository) Proxy.newProxyInstance(
+                PurchaseOrderRepository.class.getClassLoader(),
+                new Class<?>[]{PurchaseOrderRepository.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findById" -> Optional.ofNullable(PURCHASE_ORDERS.get((UUID) args[0]));
+                    case "findByIdAndLocationId" -> Optional.ofNullable(PURCHASE_ORDERS.get((UUID) args[0]))
+                            .filter(order -> order.getLocationId().equals(args[1]));
+                    case "findByLocationIdOrderByGeneratedAtDesc" -> PURCHASE_ORDERS.values().stream()
+                            .filter(order -> order.getLocationId().equals(args[0]))
+                            .sorted(Comparator.comparing(PurchaseOrder::getGeneratedAt).reversed())
+                            .toList();
+                    case "save" -> savePurchaseOrder((PurchaseOrder) args[0]);
+                    case "findAll" -> List.copyOf(PURCHASE_ORDERS.values());
+                    case "toString" -> "AuthTestPurchaseOrderRepository";
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == args[0];
                     default -> throw new UnsupportedOperationException(method.getName());
@@ -218,6 +265,14 @@ class AuthTestRepositoryConfig {
         DRUGS.put(drug.getDin(), drug);
     }
 
+    static void putOrganization(Organization organization) {
+        ORGANIZATIONS.put(organization.getId(), organization);
+    }
+
+    static void putPurchaseOrder(PurchaseOrder purchaseOrder) {
+        PURCHASE_ORDERS.put(purchaseOrder.getId(), purchaseOrder);
+    }
+
     static int uploadCount() {
         return CSV_UPLOADS.size();
     }
@@ -232,6 +287,22 @@ class AuthTestRepositoryConfig {
         }
         CSV_UPLOADS.put(upload.getId(), upload);
         return upload;
+    }
+
+    private Organization saveOrganization(Organization organization) {
+        if (organization.getId() == null) {
+            ReflectionTestUtils.setField(organization, "id", UUID.randomUUID());
+        }
+        ORGANIZATIONS.put(organization.getId(), organization);
+        return organization;
+    }
+
+    private PurchaseOrder savePurchaseOrder(PurchaseOrder purchaseOrder) {
+        if (purchaseOrder.getId() == null) {
+            ReflectionTestUtils.setField(purchaseOrder, "id", UUID.randomUUID());
+        }
+        PURCHASE_ORDERS.put(purchaseOrder.getId(), purchaseOrder);
+        return purchaseOrder;
     }
 
     private record UserKey(UUID id, String email) {

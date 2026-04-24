@@ -32,6 +32,9 @@ pharmaforecast:
   forecast-service-url: ${FORECAST_SERVICE_BASE_URL:${FORECAST_SERVICE_URL:}}
   backtest-on-upload-enabled: ${BACKTEST_ON_UPLOAD_ENABLED:true}
   backtest-http-timeout-seconds: ${BACKTEST_HTTP_TIMEOUT_SECONDS:60}
+  resend:
+    api-key: ${RESEND_API_KEY:}
+    from-email: ${RESEND_FROM_EMAIL:}
   security:
     supabase:
       jwk-set-uri: ${SUPABASE_JWKS_URI:http://localhost:54321/auth/v1/.well-known/jwks.json}
