@@ -66,6 +66,9 @@ public class Forecast extends BaseEntity {
     @Column(name = "data_points_used")
     private Integer dataPointsUsed;
 
+    @Column(name = "is_outdated", nullable = false)
+    private Boolean isOutdated = false;
+
     public void setLocationId(UUID locationId) {
         this.locationId = locationId;
     }
@@ -176,5 +179,13 @@ public class Forecast extends BaseEntity {
 
     public Integer getDataPointsUsed() {
         return dataPointsUsed;
+    }
+
+    public Boolean isOutdated() {
+        return isOutdated;
+    }
+
+    public void setIsOutdated(Boolean isOutdated) {
+        this.isOutdated = isOutdated;
     }
 }

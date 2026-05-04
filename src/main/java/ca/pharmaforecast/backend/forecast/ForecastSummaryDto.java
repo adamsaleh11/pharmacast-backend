@@ -24,6 +24,8 @@ public record ForecastSummaryDto(
         Integer currentStock,
         @JsonProperty("stock_entered")
         boolean stockEntered,
-        ForecastThresholdDto threshold
+        ForecastThresholdDto threshold,
+        @JsonProperty("is_outdated")
+        boolean isOutdated
 ) {
 }

@@ -1,10 +1,12 @@
 package ca.pharmaforecast.backend.currentstock;
 
+import ca.pharmaforecast.backend.forecast.ForecastRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -12,17 +14,32 @@ import java.util.UUID;
 public class CurrentStockService {
 
     private final CurrentStockRepository currentStockRepository;
+    private final ForecastRepository forecastRepository;
 
-    public CurrentStockService(CurrentStockRepository currentStockRepository) {
+    public CurrentStockService(CurrentStockRepository currentStockRepository, ForecastRepository forecastRepository) {
         this.currentStockRepository = currentStockRepository;
+        this.forecastRepository = forecastRepository;
     }
 
     public CurrentStock upsert(UUID locationId, String din, int quantity) {
-        CurrentStock stock = currentStockRepository.findByLocationIdAndDin(locationId, din).orElseGet(CurrentStock::new);
+        Optional<CurrentStock> existingStock = currentStockRepository.findByLocationIdAndDin(locationId, din);
+        CurrentStock stock = existingStock.orElseGet(CurrentStock::new);
+
+        // Check if this is an update (not a new insert) and if quantity changed
+        boolean isUpdate = existingStock.isPresent();
+        boolean quantityChanged = isUpdate && !stock.getQuantity().equals(quantity);
+
         stock.setLocationId(locationId);
         stock.setDin(din);
         stock.setQuantity(quantity);
-        return currentStockRepository.save(stock);
+        CurrentStock saved = currentStockRepository.save(stock);
+
+        // Mark all forecasts for this (location, din) as outdated if stock changed
+        if (quantityChanged) {
+            forecastRepository.markAsOutdatedByLocationAndDin(locationId, din);
+        }
+
+        return saved;
     }
 
     public List<CurrentStock> upsertAll(UUID locationId, List<Entry> entries) {

@@ -87,7 +87,11 @@ public class ForecastService {
                             .formatted(result.din(), result.modelPath())
             );
         }
-        Forecast forecast = new Forecast();
+
+        Forecast forecast = forecastRepository.findByLocationIdAndDinAndForecastHorizonDays(
+                locationId, result.din(), result.horizonDays()
+        ).orElse(new Forecast());
+
         forecast.setLocationId(locationId);
         forecast.setDin(result.din());
         forecast.setGeneratedAt(Instant.parse(result.generatedAt()));
@@ -102,6 +106,7 @@ public class ForecastService {
         forecast.setAvgDailyDemand(BigDecimal.valueOf(result.avgDailyDemand()));
         forecast.setReorderPoint(BigDecimal.valueOf(result.reorderPoint()));
         forecast.setDataPointsUsed(result.dataPointsUsed());
+        forecast.setIsOutdated(false);
         return forecastRepository.save(forecast);
     }
 

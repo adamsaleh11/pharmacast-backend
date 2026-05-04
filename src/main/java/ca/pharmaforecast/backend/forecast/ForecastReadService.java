@@ -36,14 +36,14 @@ public class ForecastReadService {
 
     public List<ForecastSummaryDto> getLatestForecasts(UUID locationId, ForecastQueryParams params) {
         List<Forecast> latest = forecastRepository.findByLocationIdOrderByGeneratedAtDesc(locationId).stream()
-                .collect(Collectors.groupingBy(Forecast::getDin, Collectors.collectingAndThen(
+                .filter(forecast -> params.horizonDays() == null || params.horizonDays().equals(forecast.getForecastHorizonDays()))
+                .collect(Collectors.groupingBy(f -> new java.util.AbstractMap.SimpleEntry<>(f.getDin(), f.getForecastHorizonDays()), Collectors.collectingAndThen(
                         Collectors.maxBy(Comparator.comparing(Forecast::getGeneratedAt)),
                         forecast -> forecast.orElse(null)
                 )))
                 .values()
                 .stream()
                 .filter(forecast -> forecast != null)
-                .filter(forecast -> params.horizonDays() == null || params.horizonDays().equals(forecast.getForecastHorizonDays()))
                 .filter(forecast -> params.status() == null || params.status().equalsIgnoreCase(forecast.getReorderStatus().name()))
                 .sorted(sorter(params))
                 .toList();
@@ -79,7 +79,8 @@ public class ForecastReadService {
                                 .map(CurrentStock::getQuantity)
                                 .orElse(null),
                         currentStockRepository.findByLocationIdAndDin(locationId, forecast.getDin()).isPresent(),
-                        thresholdsByDin.get(forecast.getDin())
+                        thresholdsByDin.get(forecast.getDin()),
+                        forecast.isOutdated() != null && forecast.isOutdated()
                 ))
                 .toList();
     }
