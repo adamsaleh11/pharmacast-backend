@@ -3,6 +3,7 @@ package ca.pharmaforecast.backend.forecast;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.List;
 
 public record ForecastSummaryDto(
         String din,
@@ -26,6 +27,8 @@ public record ForecastSummaryDto(
         boolean stockEntered,
         ForecastThresholdDto threshold,
         @JsonProperty("is_outdated")
-        boolean isOutdated
+        boolean isOutdated,
+        @JsonProperty("graph_points")
+        List<Integer> graphPoints
 ) {
 }

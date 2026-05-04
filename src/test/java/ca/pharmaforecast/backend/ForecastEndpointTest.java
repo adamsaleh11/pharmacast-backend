@@ -124,6 +124,7 @@ class ForecastEndpointTest {
                 .andExpect(status().isForbidden());
     }
 
+
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor supabaseJwt(UUID userId, String email) {
         return jwt().jwt(token -> token
                 .subject(userId.toString())

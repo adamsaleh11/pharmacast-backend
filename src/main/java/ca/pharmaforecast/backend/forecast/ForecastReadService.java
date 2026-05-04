@@ -7,6 +7,7 @@ import ca.pharmaforecast.backend.currentstock.CurrentStockRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +81,8 @@ public class ForecastReadService {
                                 .orElse(null),
                         currentStockRepository.findByLocationIdAndDin(locationId, forecast.getDin()).isPresent(),
                         thresholdsByDin.get(forecast.getDin()),
-                        forecast.isOutdated() != null && forecast.isOutdated()
+                        forecast.isOutdated() != null && forecast.isOutdated(),
+                        calculateGraphPoints(forecast)
                 ))
                 .toList();
     }
@@ -116,5 +118,26 @@ public class ForecastReadService {
     private String strength(Map<String, Drug> drugsByDin, String din) {
         Drug drug = drugsByDin.get(din);
         return drug == null ? null : drug.getStrength();
+    }
+
+    private List<Integer> calculateGraphPoints(Forecast forecast) {
+        if (forecast == null || forecast.getPredictedQuantity() == null || forecast.getForecastHorizonDays() == null) {
+            return null;
+        }
+
+        int horizonDays = forecast.getForecastHorizonDays();
+        int totalQuantity = forecast.getPredictedQuantity();
+
+        List<Integer> points = new ArrayList<>();
+        int pointCount = horizonDays;
+        int baseValue = totalQuantity / pointCount;
+        int remainder = totalQuantity % pointCount;
+
+        for (int i = 0; i < pointCount; i++) {
+            int value = baseValue + (i < remainder ? 1 : 0);
+            points.add(value);
+        }
+
+        return points;
     }
 }
