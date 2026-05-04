@@ -30,4 +30,36 @@ public class NotificationSettings extends BaseEntity {
 
     @Column(name = "critical_alerts_enabled", nullable = false)
     private Boolean criticalAlertsEnabled;
+
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public Boolean getDailyDigestEnabled() {
+        return dailyDigestEnabled;
+    }
+
+    public void setDailyDigestEnabled(Boolean dailyDigestEnabled) {
+        this.dailyDigestEnabled = dailyDigestEnabled;
+    }
+
+    public Boolean getWeeklyInsightsEnabled() {
+        return weeklyInsightsEnabled;
+    }
+
+    public void setWeeklyInsightsEnabled(Boolean weeklyInsightsEnabled) {
+        this.weeklyInsightsEnabled = weeklyInsightsEnabled;
+    }
+
+    public Boolean getCriticalAlertsEnabled() {
+        return criticalAlertsEnabled;
+    }
+
+    public void setCriticalAlertsEnabled(Boolean criticalAlertsEnabled) {
+        this.criticalAlertsEnabled = criticalAlertsEnabled;
+    }
 }

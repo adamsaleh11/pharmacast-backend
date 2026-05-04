@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface LocationRepository extends JpaRepository<Location, UUID> {
     List<Location> findByOrganizationIdAndDeactivatedAtIsNullOrderByNameAsc(UUID organizationId);
+
+    List<Location> findByDeactivatedAtIsNullOrderByNameAsc();
 }

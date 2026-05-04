@@ -202,20 +202,35 @@ public class PurchaseOrderService {
     @Transactional
     public PurchaseOrderGenerateResponse generate(UUID locationId, PurchaseOrderPreviewResponse draft) {
         validateLocationOwnership(locationId);
-        if (purchaseOrderRepository == null || objectMapper == null) {
-            throw new UnsupportedOperationException("Purchase order persistence is not configured");
-        }
         PurchaseOrder order = new PurchaseOrder();
         order.setLocationId(locationId);
-        order.setGeneratedAt(draft.generatedAt() == null ? now() : draft.generatedAt());
-        order.setGrokOutput(draft.orderText() == null ? "" : draft.orderText());
-        try {
-            order.setLineItems(objectMapper.writeValueAsString(draft.lineItems() == null ? List.of() : draft.lineItems()));
-        } catch (Exception ex) {
-            throw new IllegalStateException("Could not serialize purchase order line items", ex);
-        }
         order.setStatus(ca.pharmaforecast.backend.purchaseorder.PurchaseOrderStatus.draft);
-        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        PurchaseOrder saved = savePurchaseOrder(order, draft);
+        return new PurchaseOrderGenerateResponse(
+                saved.getId(),
+                saved.getGeneratedAt(),
+                saved.getGrokOutput(),
+                draft.lineItems() == null ? List.of() : draft.lineItems()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseOrderDetailResponse get(UUID locationId, UUID orderId) {
+        PurchaseOrder order = loadOrder(locationId, orderId);
+        return new PurchaseOrderDetailResponse(
+                order.getId(),
+                order.getGeneratedAt(),
+                order.getGrokOutput(),
+                lineItems(order)
+        );
+    }
+
+    @Transactional
+    public PurchaseOrderGenerateResponse update(UUID locationId, UUID orderId, PurchaseOrderPreviewResponse draft) {
+        PurchaseOrder order = loadOrder(locationId, orderId);
+        PurchaseOrderStatus status = order.getStatus() == null ? PurchaseOrderStatus.draft : order.getStatus();
+        order.setStatus(status);
+        PurchaseOrder saved = savePurchaseOrder(order, draft);
         return new PurchaseOrderGenerateResponse(
                 saved.getId(),
                 saved.getGeneratedAt(),
@@ -469,6 +484,21 @@ public class PurchaseOrderService {
         }
         return purchaseOrderRepository.findByIdAndLocationId(orderId, locationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase order not found"));
+    }
+
+    private PurchaseOrder savePurchaseOrder(PurchaseOrder order, PurchaseOrderPreviewResponse draft) {
+        if (purchaseOrderRepository == null || objectMapper == null) {
+            throw new UnsupportedOperationException("Purchase order persistence is not configured");
+        }
+        order.setGeneratedAt(draft.generatedAt() == null ? now() : draft.generatedAt());
+        order.setGrokOutput(draft.orderText() == null ? "" : draft.orderText());
+        try {
+            order.setLineItems(objectMapper.writeValueAsString(draft.lineItems() == null ? List.of() : draft.lineItems()));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Could not serialize purchase order line items", ex);
+        }
+        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        return saved;
     }
 
     private List<PurchaseOrderPreviewResponse.LineItem> lineItems(PurchaseOrder order) {

@@ -32,6 +32,8 @@ pharmaforecast:
   forecast-service-url: ${FORECAST_SERVICE_BASE_URL:${FORECAST_SERVICE_URL:}}
   backtest-on-upload-enabled: ${BACKTEST_ON_UPLOAD_ENABLED:true}
   backtest-http-timeout-seconds: ${BACKTEST_HTTP_TIMEOUT_SECONDS:60}
+  insights:
+    stockout-value-per-day: ${INSIGHTS_STOCKOUT_VALUE_PER_DAY:150}
   resend:
     api-key: ${RESEND_API_KEY:}
     from-email: ${RESEND_FROM_EMAIL:}
@@ -43,6 +45,13 @@ pharmaforecast:
         - ${SUPABASE_JWT_AUDIENCE:authenticated}
   jobs:
     din-refresh-cron: ${DIN_REFRESH_CRON:0 0 7 * * SUN}
+    # UTC cron defaults map to Eastern Standard Time. During daylight saving time,
+    # local delivery shifts one hour later unless these values are changed or a
+    # future scheduler uses zone-aware America/Toronto cron.
+    daily-notification-cron: ${DAILY_NOTIFICATION_CRON:0 0 11 * * *}
+    daily-digest-cron: ${DAILY_DIGEST_CRON:0 0 12 * * *}
+    weekly-insights-cron: ${WEEKLY_INSIGHTS_CRON:0 0 13 * * MON}
+  app-url: ${APP_URL:http://localhost:3000}
 
 management:
   endpoints:

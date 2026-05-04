@@ -47,6 +47,10 @@ public class DrugThreshold extends BaseEntity {
         return leadTimeDays;
     }
 
+    public String getDin() {
+        return din;
+    }
+
     public Integer getRedThresholdDays() {
         return redThresholdDays;
     }

@@ -81,4 +81,8 @@ public class DispensingRecord extends BaseEntity {
     public void setQuantityOnHand(Integer quantityOnHand) {
         this.quantityOnHand = quantityOnHand;
     }
+
+    public BigDecimal getCostPerUnit() {
+        return costPerUnit;
+    }
 }

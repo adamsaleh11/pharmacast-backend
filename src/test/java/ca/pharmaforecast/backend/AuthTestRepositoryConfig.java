@@ -16,10 +16,14 @@ import ca.pharmaforecast.backend.forecast.ForecastServiceClient;
 import ca.pharmaforecast.backend.forecast.StockAdjustmentRepository;
 import ca.pharmaforecast.backend.notification.DrugAlertEmailService;
 import ca.pharmaforecast.backend.notification.NotificationRepository;
+import ca.pharmaforecast.backend.notification.NotificationSettingsRepository;
+import ca.pharmaforecast.backend.notification.ResendEmailService;
 import ca.pharmaforecast.backend.organization.Organization;
 import ca.pharmaforecast.backend.organization.OrganizationRepository;
 import ca.pharmaforecast.backend.purchaseorder.PurchaseOrder;
 import ca.pharmaforecast.backend.purchaseorder.PurchaseOrderRepository;
+import ca.pharmaforecast.backend.chat.ChatMessageRepository;
+import ca.pharmaforecast.backend.insights.InsightsService;
 import ca.pharmaforecast.backend.upload.CsvUpload;
 import ca.pharmaforecast.backend.upload.CsvProcessingJob;
 import ca.pharmaforecast.backend.upload.CsvUploadRepository;
@@ -232,6 +236,26 @@ class AuthTestRepositoryConfig {
     @Bean
     NotificationRepository notificationRepository() {
         return mock(NotificationRepository.class);
+    }
+
+    @Bean
+    NotificationSettingsRepository notificationSettingsRepository() {
+        return mock(NotificationSettingsRepository.class);
+    }
+
+    @Bean
+    ResendEmailService resendEmailService() {
+        return mock(ResendEmailService.class);
+    }
+
+    @Bean
+    InsightsService insightsService() {
+        return mock(InsightsService.class);
+    }
+
+    @Bean
+    ChatMessageRepository chatMessageRepository() {
+        return mock(ChatMessageRepository.class);
     }
 
     @Bean

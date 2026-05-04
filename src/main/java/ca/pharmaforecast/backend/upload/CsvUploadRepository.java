@@ -10,4 +10,8 @@ public interface CsvUploadRepository extends JpaRepository<CsvUpload, UUID> {
     List<CsvUpload> findTop10ByLocationIdOrderByUploadedAtDesc(UUID locationId);
 
     Optional<CsvUpload> findByIdAndLocationId(UUID id, UUID locationId);
+
+    Optional<CsvUpload> findTopByLocationIdAndStatusOrderByUploadedAtDesc(UUID locationId, CsvUploadStatus status);
+
+    long countByLocationIdAndStatus(UUID locationId, CsvUploadStatus status);
 }

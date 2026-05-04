@@ -61,6 +61,15 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    Map<String, String> illegalArgument(IllegalArgumentException ex) {
+        return Map.of(
+                "error", "INVALID_REQUEST",
+                "message", ex.getMessage()
+        );
+    }
+
     @ExceptionHandler(ForecastNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     Map<String, String> forecastNotFound(ForecastNotFoundException ex) {

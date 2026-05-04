@@ -338,6 +338,136 @@ class PurchaseOrderServiceTest {
     }
 
     @Test
+    void getReturnsPersistedPurchaseOrderForTheRequestedLocation() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        PurchaseOrder order = order(locationId, Instant.parse("2026-04-23T10:00:00Z"), PurchaseOrderStatus.draft, """
+                [
+                  {
+                    "din": "12345678",
+                    "drug_name": "Amoxicillin",
+                    "strength": "500 mg",
+                    "form": "capsule",
+                    "current_stock": 8,
+                    "predicted_quantity": 12,
+                    "recommended_quantity": 15,
+                    "days_of_supply": 4.5,
+                    "reorder_status": "RED",
+                    "avg_daily_demand": 3.0,
+                    "lead_time_days": 2,
+                    "quantity_to_order": 15,
+                    "priority": "URGENT"
+                  }
+                ]
+                """);
+        ReflectionTestUtils.setField(order, "id", orderId);
+
+        when(currentUserService.requireCurrentUser()).thenReturn(new AuthenticatedUserPrincipal(
+                userId,
+                "owner@example.com",
+                organizationId,
+                UserRole.owner
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId, "Downtown Pharmacy", "123 Bank St, Ottawa, ON")));
+        when(purchaseOrderRepository.findByIdAndLocationId(orderId, locationId)).thenReturn(Optional.of(order));
+
+        PurchaseOrderService persistingService = persistedService();
+
+        var method = PurchaseOrderService.class.getMethod("get", UUID.class, UUID.class);
+        Object result = method.invoke(persistingService, locationId, orderId);
+
+        assertThat(result).isInstanceOf(PurchaseOrderDetailResponse.class);
+        PurchaseOrderDetailResponse response = (PurchaseOrderDetailResponse) result;
+        assertThat(response.orderId()).isEqualTo(orderId);
+        assertThat(response.generatedAt()).isEqualTo(Instant.parse("2026-04-23T10:00:00Z"));
+        assertThat(response.orderText()).isEqualTo("Order text");
+        assertThat(response.lineItems()).hasSize(1);
+        assertThat(response.lineItems().get(0).quantityToOrder()).isEqualTo(15);
+    }
+
+    @Test
+    void updateReplacesThePersistedDraftForTheSameOrderId() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        PurchaseOrder order = order(locationId, Instant.parse("2026-04-23T10:00:00Z"), PurchaseOrderStatus.draft, """
+                [
+                  {
+                    "din": "12345678",
+                    "drug_name": "Amoxicillin",
+                    "strength": "500 mg",
+                    "form": "capsule",
+                    "current_stock": 8,
+                    "predicted_quantity": 12,
+                    "recommended_quantity": 15,
+                    "days_of_supply": 4.5,
+                    "reorder_status": "RED",
+                    "avg_daily_demand": 3.0,
+                    "lead_time_days": 2,
+                    "quantity_to_order": 15,
+                    "priority": "URGENT"
+                  }
+                ]
+                """);
+        ReflectionTestUtils.setField(order, "id", orderId);
+
+        when(currentUserService.requireCurrentUser()).thenReturn(new AuthenticatedUserPrincipal(
+                userId,
+                "owner@example.com",
+                organizationId,
+                UserRole.owner
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location(locationId, organizationId, "Downtown Pharmacy", "123 Bank St, Ottawa, ON")));
+        when(purchaseOrderRepository.findByIdAndLocationId(orderId, locationId)).thenReturn(Optional.of(order));
+        when(purchaseOrderRepository.save(any(PurchaseOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PurchaseOrderService persistingService = persistedService();
+
+        var method = PurchaseOrderService.class.getMethod("update", UUID.class, UUID.class, PurchaseOrderPreviewResponse.class);
+        PurchaseOrderPreviewResponse draft = new PurchaseOrderPreviewResponse(
+                Instant.parse("2026-04-23T10:30:00Z"),
+                "Updated purchase order text",
+                List.of(new PurchaseOrderPreviewResponse.LineItem(
+                        "12345678",
+                        "Amoxicillin",
+                        "500 mg",
+                        "capsule",
+                        8,
+                        12,
+                        18,
+                        new BigDecimal("4.5"),
+                        "RED",
+                        new BigDecimal("3.0"),
+                        2,
+                        18,
+                        "URGENT"
+                ))
+        );
+
+        Object result = method.invoke(persistingService, locationId, orderId, draft);
+
+        assertThat(result).isInstanceOf(PurchaseOrderGenerateResponse.class);
+        PurchaseOrderGenerateResponse response = (PurchaseOrderGenerateResponse) result;
+        assertThat(response.orderId()).isEqualTo(orderId);
+        assertThat(response.generatedAt()).isEqualTo(Instant.parse("2026-04-23T10:30:00Z"));
+        assertThat(response.orderText()).isEqualTo("Updated purchase order text");
+        assertThat(response.lineItems()).hasSize(1);
+        assertThat(response.lineItems().get(0).quantityToOrder()).isEqualTo(18);
+
+        ArgumentCaptor<PurchaseOrder> orderCaptor = ArgumentCaptor.forClass(PurchaseOrder.class);
+        verify(purchaseOrderRepository).save(orderCaptor.capture());
+        PurchaseOrder saved = orderCaptor.getValue();
+        assertThat(saved.getId()).isEqualTo(orderId);
+        assertThat(saved.getLocationId()).isEqualTo(locationId);
+        assertThat(saved.getGrokOutput()).isEqualTo("Updated purchase order text");
+        assertThat(saved.getStatus()).isEqualTo(PurchaseOrderStatus.draft);
+        assertThat(saved.getLineItems()).contains("\"quantity_to_order\":18");
+    }
+
+    @Test
     void exportCsvReturnsPersistedLineItemsWithExpectedColumns() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID organizationId = UUID.randomUUID();

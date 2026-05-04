@@ -87,8 +87,7 @@ public class ForecastService {
                             .formatted(result.din(), result.modelPath())
             );
         }
-        Forecast forecast = forecastRepository.findTopByLocationIdAndDinOrderByGeneratedAtDesc(locationId, result.din())
-                .orElseGet(Forecast::new);
+        Forecast forecast = new Forecast();
         forecast.setLocationId(locationId);
         forecast.setDin(result.din());
         forecast.setGeneratedAt(Instant.parse(result.generatedAt()));

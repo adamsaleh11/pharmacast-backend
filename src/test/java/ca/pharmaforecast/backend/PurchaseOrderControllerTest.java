@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,10 +140,81 @@ class PurchaseOrderControllerTest {
     }
 
     @Test
+    void getEndpointReturnsSavedPurchaseOrder() throws Exception {
+        UUID locationId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID orderId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+        when(purchaseOrderService.get(eq(locationId), eq(orderId))).thenReturn(
+                new ca.pharmaforecast.backend.purchaseorder.PurchaseOrderDetailResponse(
+                        orderId,
+                        Instant.parse("2026-04-23T00:00:00Z"),
+                        "Purchase Order — Downtown Pharmacy — 2026-04-23",
+                        List.of(new PurchaseOrderPreviewResponse.LineItem(
+                                "12345678",
+                                "Amoxicillin",
+                                "500 mg",
+                                "capsule",
+                                8,
+                                12,
+                                15,
+                                new BigDecimal("4.5"),
+                                "RED",
+                                new BigDecimal("3"),
+                                2,
+                                15,
+                                "URGENT"
+                        ))
+                )
+        );
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/locations/{locationId}/purchase-orders/{orderId}", locationId, orderId)
+                        .with(jwt().jwt(token -> token
+                                .subject("22222222-2222-2222-2222-222222222222")
+                                .claim("email", "owner@example.com")
+                                .audience(List.of("authenticated")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.generated_at").value("2026-04-23T00:00:00Z"))
+                .andExpect(jsonPath("$.line_items[0].quantity_to_order").value(15));
+    }
+
+    @Test
+    void putEndpointUpdatesSavedPurchaseOrder() throws Exception {
+        UUID locationId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID orderId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+        when(purchaseOrderService.update(eq(locationId), eq(orderId), any()))
+                .thenReturn(new ca.pharmaforecast.backend.purchaseorder.PurchaseOrderGenerateResponse(
+                        orderId,
+                        Instant.parse("2026-04-23T01:00:00Z"),
+                        "Updated purchase order text",
+                        List.of()
+                ));
+
+        mockMvc.perform(put("/locations/{locationId}/purchase-orders/{orderId}", locationId, orderId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "generated_at": "2026-04-23T01:00:00Z",
+                                  "order_text": "Updated purchase order text",
+                                  "line_items": []
+                                }
+                                """)
+                        .with(jwt().jwt(token -> token
+                                .subject("22222222-2222-2222-2222-222222222222")
+                                .claim("email", "owner@example.com")
+                                .audience(List.of("authenticated")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.generated_at").value("2026-04-23T01:00:00Z"));
+    }
+
+    @Test
     void exportCsvEndpointReturnsAttachment() throws Exception {
         UUID locationId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID orderId = UUID.fromString("55555555-5555-5555-5555-555555555555");
         when(purchaseOrderService.exportCsv(eq(locationId), eq(orderId))).thenReturn("Drug Name,DIN\nAmoxicillin,12345678\n".getBytes(StandardCharsets.UTF_8));
+        when(purchaseOrderService.generatedAt(eq(locationId), eq(orderId))).thenReturn(Instant.parse("2026-04-23T00:00:00Z"));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/locations/{locationId}/purchase-orders/{orderId}/export/csv", locationId, orderId)
                         .with(jwt().jwt(token -> token
@@ -159,6 +231,7 @@ class PurchaseOrderControllerTest {
         UUID locationId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID orderId = UUID.fromString("55555555-5555-5555-5555-555555555555");
         when(purchaseOrderService.exportPdf(eq(locationId), eq(orderId))).thenReturn(new byte[]{1, 2, 3});
+        when(purchaseOrderService.generatedAt(eq(locationId), eq(orderId))).thenReturn(Instant.parse("2026-04-23T00:00:00Z"));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/locations/{locationId}/purchase-orders/{orderId}/export/pdf", locationId, orderId)
                         .with(jwt().jwt(token -> token
